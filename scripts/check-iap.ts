@@ -91,6 +91,26 @@ try {
   check(showWebLink("ios", "USA") === true, "iOS US storefront: web link shown");
   check(showWebLink("ios", "CAN") === false, "iOS non-US storefront: web link hidden");
   check(showWebLink("ios", null) === false, "iOS unknown storefront: web link hidden (safe default)");
+
+  // Guideline 3.1.2 — Apple rejected 1.0 on 2026-07-30 for offering auto-renewable
+  // subscriptions without a functional Terms of Use (EULA) link. The store description is
+  // fixed in App Store Connect; these assert the BINARY half stays fixed, since the paywall
+  // is the only place a reviewer can see it and nothing else in CI renders this component.
+  console.log("\nChecking subscription disclosure on the native paywall (Guideline 3.1.2):");
+  const paywall = readFileSync(join(__dirname, "../src/components/NativeBilling.tsx"), "utf8");
+  check(
+    paywall.includes("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"),
+    "paywall links Apple's standard Terms of Use (EULA) — no custom EULA is registered in ASC",
+  );
+  check(paywall.includes('t("cust.billing.iap.terms")'), "paywall renders the Terms of Use link label");
+  check(paywall.includes('t("cust.billing.iap.privacy")'), "paywall renders the privacy-policy link label");
+  check(paywall.includes('t("cust.billing.iap.period"'), "paywall states the subscription LENGTH beside the price, not a bare amount");
+  for (const locale of ["en", "zh"] as const) {
+    const msgs = readFileSync(join(__dirname, `../src/lib/i18n/${locale}.ts`), "utf8");
+    for (const key of ["period", "terms", "privacy", "renewal"]) {
+      check(msgs.includes(`"cust.billing.iap.${key}"`), `${locale}.ts defines cust.billing.iap.${key}`);
+    }
+  }
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

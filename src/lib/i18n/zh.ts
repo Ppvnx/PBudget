@@ -251,6 +251,12 @@ const zh: Messages = {
   "cust.billing.iap.unavailable": "此版本暂不支持应用内订阅。",
   "cust.billing.iap.webLink": "在网页端订阅，约可省 30%",
   "cust.billing.iap.error": "购买未能完成，请重试。",
+  // Guideline 3.1.2 — the paywall must state the subscription length and link the Terms of
+  // Use (EULA) + privacy policy inside the binary, not only in the store description.
+  "cust.billing.iap.period": "{price}/月",
+  "cust.billing.iap.terms": "使用条款 (EULA)",
+  "cust.billing.iap.privacy": "隐私政策",
+  "cust.billing.iap.renewal": "按月自动续订，直至取消。可在账户设置中管理或取消。",
   // delete account (App Store / Play in-app account deletion requirement)
   "cust.delete.button": "删除账户",
   "cust.delete.confirm": "这将永久删除您的账户及所有数据。",

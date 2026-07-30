@@ -254,6 +254,12 @@ const en = {
   "cust.billing.iap.unavailable": "In-app subscriptions aren't available in this build.",
   "cust.billing.iap.webLink": "Subscribe on the web and save ~30%",
   "cust.billing.iap.error": "Purchase couldn't be completed. Please try again.",
+  // Guideline 3.1.2 — the paywall must state the subscription length and link the Terms of
+  // Use (EULA) + privacy policy inside the binary, not only in the store description.
+  "cust.billing.iap.period": "{price}/month",
+  "cust.billing.iap.terms": "Terms of Use (EULA)",
+  "cust.billing.iap.privacy": "Privacy Policy",
+  "cust.billing.iap.renewal": "Auto-renews monthly until cancelled. Manage or cancel in your account settings.",
   // delete account (App Store / Play in-app account deletion requirement)
   "cust.delete.button": "Delete account",
   "cust.delete.confirm": "This permanently deletes your account and all your data.",

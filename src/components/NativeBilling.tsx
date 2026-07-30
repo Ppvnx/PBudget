@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useT } from "@/lib/i18n/context";
 import { showWebLink } from "@/lib/iap_geo";
 
@@ -19,6 +20,13 @@ import { showWebLink } from "@/lib/iap_geo";
 type Tier = "pro" | "max";
 type IapConfig = { enabled: boolean; products: { pro: string; max: string } | null; webUrl: string };
 type Product = { tier: Tier; id: string; price: string };
+
+// Guideline 3.1.2 requires the BINARY (not just the store description) to disclose the
+// subscription length and carry functional Terms of Use (EULA) + privacy policy links.
+// No custom EULA is registered in App Store Connect, so Apple's standard one is the one
+// that applies — link exactly that. Both products are ONE_MONTH, which is why the period
+// is a constant here rather than read back off the StoreKit offer.
+const APPLE_STD_EULA = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
 // Minimal shape of the cordova-plugin-purchase global we touch (avoids importing the
 // package into the web bundle; the native shell injects it at runtime).
@@ -148,7 +156,7 @@ export default function NativeBilling({
           {products.map((p) => (
             <tr key={p.id}>
               <td>{t(`cust.billing.plan.${p.tier}`)}</td>
-              <td>{p.price || "—"}</td>
+              <td>{p.price ? t("cust.billing.iap.period", { price: p.price }) : "—"}</td>
               <td style={{ textAlign: "right" }}>
                 {active && currentPlan === p.tier ? (
                   <span className="muted">{t("cust.billing.current")}</span>
@@ -164,6 +172,12 @@ export default function NativeBilling({
       </table>
       {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
       {webLink}
+      <p className="muted" style={{ marginTop: 12 }}>
+        {t("cust.billing.iap.renewal")}{" "}
+        <a href={APPLE_STD_EULA} target="_blank" rel="noreferrer">{t("cust.billing.iap.terms")}</a>
+        {" · "}
+        <Link href="/privacy" target="_blank">{t("cust.billing.iap.privacy")}</Link>
+      </p>
     </div>
   );
 }
