@@ -14,26 +14,37 @@ import { useEffect, useState } from "react";
 // build must never pull a Capacitor plugin into its bundle, and on web these all
 // resolve to a no-op rather than throwing.
 
-export async function isNative(): Promise<boolean> {
+/**
+ * Is a given native plugin actually REGISTERED in the running binary?
+ *
+ * "Is this a native platform" is not enough, and the difference is not theoretical here.
+ * The plugin's JS ships inside the WEB bundle, so `import("@capacitor/share")` resolves
+ * happily inside an OLD binary with no Share bridge compiled in — the call then fails at
+ * the bridge and the button does nothing. Because PBudget is a server.url shell, the site
+ * updates the instant it deploys while the binary only changes when a new build clears
+ * review, so every installed copy is briefly newer in JS than in native code. Gate the UI
+ * on the capability, never on the platform.
+ */
+export async function hasPlugin(name: "Share" | "Haptics"): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
-    return Capacitor.isNativePlatform();
+    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable(name);
   } catch {
     return false;
   }
 }
 
-/** Render native-only affordances. false during SSR and on web, flips true after mount. */
-export function useIsNative(): boolean {
-  const [native, setNative] = useState(false);
+/** Render an affordance only where its plugin exists. false during SSR, on web, and on old binaries. */
+export function useHasPlugin(name: "Share" | "Haptics"): boolean {
+  const [ok, setOk] = useState(false);
   useEffect(() => {
     let alive = true;
-    isNative().then((n) => alive && setNative(n));
+    hasPlugin(name).then((v) => alive && setOk(v));
     return () => {
       alive = false;
     };
-  }, []);
-  return native;
+  }, [name]);
+  return ok;
 }
 
 /**
@@ -43,7 +54,7 @@ export function useIsNative(): boolean {
  */
 export async function haptic(): Promise<void> {
   try {
-    if (!(await isNative())) return;
+    if (!(await hasPlugin("Haptics"))) return;
     const { Haptics, ImpactStyle } = await import("@capacitor/haptics");
     await Haptics.impact({ style: ImpactStyle.Light });
   } catch {
@@ -58,7 +69,7 @@ export async function haptic(): Promise<void> {
  */
 export async function shareText(o: { title: string; text: string; dialogTitle?: string }): Promise<boolean> {
   try {
-    if (!(await isNative())) return false;
+    if (!(await hasPlugin("Share"))) return false;
     const { Share } = await import("@capacitor/share");
     await Share.share(o);
     return true;

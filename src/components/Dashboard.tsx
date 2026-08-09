@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT, useLocale } from "@/lib/i18n/context";
 import { VendorIcon } from "./VendorIcon";
 import ReviewMergePicker from "./ReviewMergePicker";
-import { haptic, shareText, useIsNative } from "@/lib/native";
+import { haptic, shareText, useHasPlugin } from "@/lib/native";
 import type { DashboardData } from "@/lib/dashboard";
 
 // Graphs-only Dashboard (FR7): hand-rolled inline-SVG widgets in the Statement
@@ -37,9 +37,10 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
   const [detail, setDetail] = useState<DashboardData["budget"][number] | null>(null);
   const [vendorDetail, setVendorDetail] = useState<DashboardData["vendors"][number] | null>(null);
   const [cats, setCats] = useState<string[]>([]);
-  // Share is native-only: a browser either has no share sheet or already offers its own,
-  // so on web this button would be a worse duplicate of what the browser already gives.
-  const native = useIsNative();
+  // Gated on the PLUGIN, not the platform: the site deploys ahead of the binary, so an
+  // already-installed build can run this JS with no Share bridge behind it. A browser is
+  // excluded too — it either has no share sheet or already offers its own.
+  const canShare = useHasPlugin("Share");
 
   // Category list for inline re-categorise in the top-transactions section.
   useEffect(() => {
@@ -222,7 +223,7 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
         >
           ›
         </button>
-        {native && (
+        {canShare && (
           <button className="btn month-step" onClick={onShare} aria-label={t("dash.share.title")} title={t("dash.share.title")}>
             ↑
           </button>
