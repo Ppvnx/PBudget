@@ -281,10 +281,25 @@ input.budget { width: 92px; padding: 6px 8px; }
 
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-/* Mobile: rail collapses to a top bar; wide ledgers scroll instead of overflowing. */
-@media (max-width: 640px) {
-  .nav { padding: calc(12px + env(safe-area-inset-top)) 16px 12px; gap: 12px; }
-  .main { padding: 20px 14px 48px; }
+/* Tablet and below: the rail becomes a bottom tab bar.
+ *
+ * This is the Apple 4.2.2 boundary, not a taste call. A Capacitor bundle is universal
+ * ("1,2") unless told otherwise, so App Review opens this on an iPad — and PBudget is a
+ * server.url shell, which means what the reviewer sees IS the website. HDive was rejected
+ * on 2026-08-06 for exactly this: its bottom bar started at 760px, an iPad Air 11" is
+ * 820pt in portrait, and the reviewer got a desktop left rail stretched across 11 inches
+ * and called it a web page. PBudget's started at 640px, so EVERY iPad, in every
+ * orientation, got the rail — mini 744, Air 820, 11" Pro 834, 12.9" 1024.
+ *
+ * 1024 covers the widest iPad portrait. Narrowing the bundle to iPhone-only is the other
+ * way out and is NOT available here: PBudget 1.0 is already approved as universal, and
+ * App Store Connect refuses any update that drops a device family.
+ *
+ * Only the NAVIGATION moves — the thing that decides "app" vs "web page" at a glance.
+ * Phone tightening (type scale, tables-as-cards, hidden badges) stays at 640, so a tablet
+ * keeps roomy desktop spacing with app chrome instead of looking like a stretched phone.
+ */
+@media (max-width: 1024px) {
   /* Rail → fixed bottom tab bar (clears the Dynamic Island / notch at the top).
      Exactly 5 equal tabs, icon over label, no horizontal scroll. */
   .nav-side {
@@ -306,6 +321,26 @@ input.budget { width: 92px; padding: 6px 8px; }
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .nav-ic, .nav-ic svg { width: 20px; height: 20px; }
+  /* The rail is gone, so its 232px gutter must go too; desktop spacing otherwise
+     stays, and the bottom pad clears the tab bar + home indicator. Phone-tight
+     padding belongs at 640, not here — a tablet should not read as a big phone. */
+  .main-side { margin-left: 0; padding: calc(34px + env(safe-area-inset-top)) 44px calc(72px + env(safe-area-inset-bottom)); }
+}
+
+/* Tablet only: the same tab bar, sized for a 10-inch screen rather than a phone.
+   Five tabs across 1024pt are ~200pt each, and a 10px label at that width reads as a
+   bug, not a design. Capped and centred so the bar is a control cluster instead of a
+   full-width ribbon. Phones keep the compact sizing below. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .nav-side { padding-left: max(4px, calc((100% - 640px) / 2)); padding-right: max(4px, calc((100% - 640px) / 2)); }
+  .nav-link { font-size: 12px; gap: 4px; padding: 8px 4px; }
+  .nav-ic, .nav-ic svg { width: 24px; height: 24px; }
+}
+
+/* Mobile: rail collapses to a top bar; wide ledgers scroll instead of overflowing. */
+@media (max-width: 640px) {
+  .nav { padding: calc(12px + env(safe-area-inset-top)) 16px 12px; gap: 12px; }
+  .main { padding: 20px 14px 48px; }
   /* The id badge is a desktop power-feature (copy your sharing handle) — hide it
      on mobile so the top bar stays tight. */
   .userid-badge { display: none; }
