@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT, useLocale } from "@/lib/i18n/context";
 import { VendorIcon } from "./VendorIcon";
 import ReviewMergePicker from "./ReviewMergePicker";
+import { haptic, shareText, useIsNative } from "@/lib/native";
 import type { DashboardData } from "@/lib/dashboard";
 
 // Graphs-only Dashboard (FR7): hand-rolled inline-SVG widgets in the Statement
@@ -36,6 +37,9 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
   const [detail, setDetail] = useState<DashboardData["budget"][number] | null>(null);
   const [vendorDetail, setVendorDetail] = useState<DashboardData["vendors"][number] | null>(null);
   const [cats, setCats] = useState<string[]>([]);
+  // Share is native-only: a browser either has no share sheet or already offers its own,
+  // so on web this button would be a worse duplicate of what the browser already gives.
+  const native = useIsNative();
 
   // Category list for inline re-categorise in the top-transactions section.
   useEffect(() => {
@@ -80,7 +84,10 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
   const idx = months.indexOf(month);
   const step = (delta: number) => {
     const ni = idx + delta;
-    if (ni >= 0 && ni < months.length) changeMonth(months[ni]);
+    if (ni >= 0 && ni < months.length) {
+      haptic(); // fire-and-forget: the month must change whether or not the device buzzes
+      changeMonth(months[ni]);
+    }
   };
 
   const empty = data.trend.every((d) => d.spend === 0) && data.vendors.length === 0;
@@ -95,6 +102,27 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
   const avgSpend = activeSpends.length ? activeSpends.reduce((s, v) => s + v, 0) / activeSpends.length : 0;
   const budgetPct = totBudget > 0 ? (totActual / totBudget) * 100 : null;
   const reviewCount = data.review;
+
+  // Hand the selected month's headline numbers to the system share sheet — the one
+  // thing in this app the website genuinely cannot do (Apple 4.2.2, see lib/native).
+  // Built from the same values the KPI tiles show, so what you send is what you saw.
+  const onShare = async () => {
+    haptic();
+    const parts = [
+      t("dash.share.spent", { month: monthYearLabel(month), amount: money(spendThis) }),
+      totBudget > 0 && budgetPct != null
+        ? t("dash.share.budget", { budget: money(totBudget), pct: Math.round(budgetPct) })
+        : null,
+      momPct != null
+        ? t(momPct >= 0 ? "dash.share.momUp" : "dash.share.momDown", { pct: Math.round(Math.abs(momPct)) })
+        : null,
+    ].filter(Boolean);
+    await shareText({
+      title: t("dash.share.title"),
+      text: parts.join("\n"),
+      dialogTitle: t("dash.share.title"),
+    });
+  };
 
   return (
     <div>
@@ -194,6 +222,11 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
         >
           ›
         </button>
+        {native && (
+          <button className="btn month-step" onClick={onShare} aria-label={t("dash.share.title")} title={t("dash.share.title")}>
+            ↑
+          </button>
+        )}
       </div>
 
       {/* (c) spending distribution by category — full-width, big donut + legend */}

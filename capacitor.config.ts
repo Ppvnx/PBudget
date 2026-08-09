@@ -13,6 +13,11 @@ const config: CapacitorConfig = {
     url: "https://pbudget.ppvnx.com",
     // Cleartext stays off — the site is HTTPS-only, so the webview must be too.
     cleartext: false,
+    // With a REMOTE server.url, no network means the webview's own error page — the grey
+    // "cannot open" sheet, indistinguishable from a broken bookmark, which is precisely
+    // the read Apple 4.2.2 takes. errorPath hands that case to the bundled offline page
+    // in capacitor-www/ instead, which is why webDir exists at all.
+    errorPath: "index.html",
   },
   // The launch imageset only shows during the ~300ms native cold-start; because
   // server.url is remote, Capacitor then shows a white webview for the whole page
