@@ -311,6 +311,11 @@ input.budget { width: 92px; padding: 6px 8px; }
   }
   .nav-side .brand { display: none; }
   .nav-side .spacer { display: none; }
+  /* Same reason as brand and spacer above: a RAIL element. It is width:100%, sized for a
+     vertical column, so inside a horizontal bar it becomes a full-width block that crushes
+     the tabs. That is what shipped for a few hours on 2026-08-09 — the bar reached tablet
+     width but this did not, so 641-1024px got a broken nav. Desktop keeps it. */
+  .userid-badge { display: none; }
   .nav-link {
     flex: 1 1 0; min-width: 0;
     flex-direction: column; gap: 3px;
@@ -341,9 +346,6 @@ input.budget { width: 92px; padding: 6px 8px; }
 @media (max-width: 640px) {
   .nav { padding: calc(12px + env(safe-area-inset-top)) 16px 12px; gap: 12px; }
   .main { padding: 20px 14px 48px; }
-  /* The id badge is a desktop power-feature (copy your sharing handle) — hide it
-     on mobile so the top bar stays tight. */
-  .userid-badge { display: none; }
   .main-side { margin-left: 0; padding: calc(18px + env(safe-area-inset-top)) 12px calc(72px + env(safe-area-inset-bottom)); }
   /* Cards: tighter padding reclaims ~16px of width; wide content still scrolls. */
   .card { padding: 16px; overflow-x: auto; }
