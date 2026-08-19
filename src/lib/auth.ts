@@ -12,7 +12,6 @@ export const SESSION_COOKIE = COOKIE;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const VERIFY_TTL_MS = 1000 * 60 * 30; // 30 minutes — email OTP codes are short-lived
 const VERIFY_MAX_ATTEMPTS = 5; // wrong-code tries before a code is invalidated
-const RESET_TTL_MS = 1000 * 60 * 60; // 1 hour — password reset links are short-lived
 
 const hashCode = (code: string) => crypto.createHash("sha256").update(code).digest("hex");
 
@@ -108,6 +107,11 @@ export async function requireUser(): Promise<User> {
 // Issue a fresh 6-digit email OTP for the user and return the PLAINTEXT code (the
 // caller emails it). Only the hash is persisted. One active code per user: any
 // prior code is deleted first.
+// Also the password-reset code: receiving a code at the address proves the mailbox,
+// which is the whole of what either flow needs, so both share one row per user.
+// ponytail: one row per user means a verification and a reset in flight at the same
+// time clobber each other (newest code wins) — add a `purpose` column to EmailOtp if
+// that ever matters.
 export async function createVerificationToken(userId: string): Promise<string> {
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
   await prisma.emailOtp.deleteMany({ where: { userId } });
@@ -141,10 +145,3 @@ export async function verifyEmailCode(userId: string, code: string): Promise<Ver
   return "ok";
 }
 
-export async function createPasswordResetToken(userId: string): Promise<string> {
-  const token = crypto.randomBytes(32).toString("hex");
-  await prisma.passwordResetToken.create({
-    data: { token, userId, expiresAt: new Date(Date.now() + RESET_TTL_MS) },
-  });
-  return token;
-}

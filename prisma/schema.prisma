@@ -102,6 +102,9 @@ model EmailVerificationToken {
   @@index([userId])
 }
 
+// Legacy magic-link reset table — no longer written to (password reset moved to the
+// same EmailOtp 6-digit code as verification, so the flow never leaves the app). Kept
+// only so `prisma db push` doesn't drop the existing table.
 model PasswordResetToken {
   token     String   @id
   userId    String
