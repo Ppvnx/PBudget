@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
-import { verifyWebhook, syncItem } from "@/lib/plaid";
+import { verifyWebhook, syncItem, setLoginRequired } from "@/lib/plaid";
 import { analyzeUser } from "@/lib/analysis/analyze";
+
+// ITEM webhook codes Plaid resolves via Link update mode (our Re-auth button):
+// ERROR (usually ITEM_LOGIN_REQUIRED), and consent about to lapse.
+const NEEDS_LOGIN = new Set(["ERROR", "PENDING_EXPIRATION", "PENDING_DISCONNECT"]);
 
 // Plaid POSTs here when an item has transaction updates. The URL is public, so the
 // ES256 JWT signature is the ONLY thing gating work onto our Plaid quota + DB —
@@ -18,8 +22,14 @@ export async function POST(req: Request) {
   }
 
   const { webhook_type, webhook_code, item_id, removed_transactions } = JSON.parse(raw);
-  // Only transaction updates drive a sync. ITEM webhooks (re-auth/expiry) and the
-  // WEBHOOK_UPDATE_ACKNOWLEDGED ack are acked and ignored for now.
+  // ITEM webhooks flag/clear the reconnect prompt on /accounts. Other ITEM codes
+  // (WEBHOOK_UPDATE_ACKNOWLEDGED, NEW_ACCOUNTS_AVAILABLE, revocations) are just acked.
+  if (webhook_type === "ITEM") {
+    if (NEEDS_LOGIN.has(webhook_code)) await setLoginRequired(item_id, true);
+    else if (webhook_code === "LOGIN_REPAIRED") await setLoginRequired(item_id, false);
+    return NextResponse.json({ received: true });
+  }
+  // Only transaction updates drive a sync.
   if (webhook_type !== "TRANSACTIONS") return NextResponse.json({ received: true });
 
   const item = await prisma.plaidItem.findUnique({ where: { itemId: item_id } });

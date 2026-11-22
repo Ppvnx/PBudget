@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { gate } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
-import { refreshAndSync } from "@/lib/plaid";
+import { refreshAndSync, setLoginRequired } from "@/lib/plaid";
 import { canSyncItem, upgradeCTA } from "@/lib/stripe";
 import { analyzeUser } from "@/lib/analysis/analyze";
 
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     // Plaid errors ride on the axios error's response body — surface the exact
     // type/code/message (e.message is just "Request failed with status code 400").
     const p = e?.response?.data;
+    if (p?.error_code === "ITEM_LOGIN_REQUIRED") await setLoginRequired(item.itemId, true);
     return NextResponse.json(
       {
         error: p?.error_message || p?.display_message || e?.message || "Plaid error",

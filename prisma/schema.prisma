@@ -158,6 +158,10 @@ model PlaidItem {
   // transactions) is KEPT so history stays viewable. null = live connection.
   // Nullable/additive so `prisma db push` stays non-destructive (deploy schema guard).
   disconnectedAt     DateTime?
+  // Set when Plaid says the bank needs the user to sign in again (ITEM webhook ERROR /
+  // PENDING_EXPIRATION / PENDING_DISCONNECT, or a sync failing ITEM_LOGIN_REQUIRED);
+  // cleared by the next successful sync or a LOGIN_REPAIRED webhook. Nullable/additive.
+  loginRequiredAt    DateTime?
   accounts           PlaidAccount[]
 
   @@index([userId])

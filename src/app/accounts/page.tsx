@@ -41,6 +41,7 @@ export default async function AccountsPage() {
     institutionLogo: i.institution.logo,
     lastUpdated: i.lastUpdated.toISOString(),
     disconnected,
+    loginRequired: !!i.loginRequiredAt,
     syncAllowed: !disconnected && rank >= 0 && rank < entitlement,
     accounts: i.accounts.map((a) => ({
       accountId: a.accountId,

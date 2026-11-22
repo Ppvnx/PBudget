@@ -39,6 +39,7 @@ const en = {
   "accounts.sync.errorCode": "Code",
   "accounts.sync.requestId": "Plaid request id",
   "accounts.reauth": "Re-auth",
+  "accounts.loginRequired": "Your bank needs you to sign in again before it can sync. Tap Re-auth to reconnect — your data is kept.",
   "accounts.remove": "Remove",
   "accounts.removeConfirm": "Permanently remove {name}? This deletes its accounts and all transactions here, and revokes the connection at Plaid. This cannot be undone.",
   "accounts.removeDone": "Removed {name} and its data.",

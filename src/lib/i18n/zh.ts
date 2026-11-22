@@ -41,6 +41,7 @@ const zh: Messages = {
   "accounts.sync.errorCode": "代码",
   "accounts.sync.requestId": "Plaid 请求 id",
   "accounts.reauth": "重新授权",
+  "accounts.loginRequired": "您的银行需要重新登录才能同步。点击「重新授权」重新连接——您的数据会保留。",
   "accounts.remove": "移除",
   "accounts.removeConfirm": "确定要永久移除 {name} 吗？这将删除其账户及此处的全部交易，并在 Plaid 处撤销该连接。此操作无法撤销。",
   "accounts.removeDone": "已移除 {name} 及其数据。",
