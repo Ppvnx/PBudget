@@ -166,7 +166,13 @@ export async function syncItem(
     },
     // disconnectedAt: null reactivates a previously-removed connection when the user
     // resubscribes and re-links the same bank (fresh token → live again).
-    update: { accessToken: encrypted, disconnectedAt: null, ...(institutionId ? { institutionId } : {}) },
+    // loginRequiredAt: null — transactionsGet just succeeded, so the login works again.
+    update: {
+      accessToken: encrypted,
+      disconnectedAt: null,
+      loginRequiredAt: null,
+      ...(institutionId ? { institutionId } : {}),
+    },
   });
 
   // accounts
@@ -270,6 +276,21 @@ export async function refreshAndSync(
     await new Promise((r) => setTimeout(r, 5000));
   }
   return syncItem(userId, accessToken);
+}
+
+// Flag/clear "this bank needs the user to sign in again" (Plaid ITEM webhooks, or a
+// sync failing ITEM_LOGIN_REQUIRED). lastUpdated is pinned: /accounts shows it as when
+// the data last refreshed, and flagging refreshes nothing. No-op for an unknown item.
+export async function setLoginRequired(itemId: string, required: boolean): Promise<void> {
+  const item = await prisma.plaidItem.findUnique({
+    where: { itemId },
+    select: { lastUpdated: true, loginRequiredAt: true },
+  });
+  if (!item || !!item.loginRequiredAt === required) return;
+  await prisma.plaidItem.update({
+    where: { itemId },
+    data: { loginRequiredAt: required ? new Date() : null, lastUpdated: item.lastUpdated },
+  });
 }
 
 // ---- Remove a connection (billing expiry) --------------------------------

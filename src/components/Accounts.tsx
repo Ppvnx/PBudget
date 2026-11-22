@@ -23,6 +23,7 @@ type ItemLite = {
   lastUpdated: string;
   syncAllowed: boolean;
   disconnected: boolean; // connection removed on billing expiry (data preserved)
+  loginRequired: boolean; // Plaid says the bank needs the user to sign in again
   accounts: AccountLite[];
 };
 type Connect = { canAdd: boolean; cta: UpgradeCTA | null };
@@ -226,6 +227,10 @@ export default function Accounts({
             <p className="muted" style={{ marginTop: 0 }}>
               ⚠ {t("accounts.removed")}{" "}
               <Link href="/customizations">{t("accounts.upgrade")}</Link>
+            </p>
+          ) : it.loginRequired ? (
+            <p className="muted" style={{ marginTop: 0 }}>
+              ⚠ {t("accounts.loginRequired")}
             </p>
           ) : !it.syncAllowed ? (
             <p className="muted" style={{ marginTop: 0 }}>
