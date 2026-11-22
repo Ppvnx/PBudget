@@ -224,16 +224,16 @@ export default function Accounts({
           </div>
 
           {it.disconnected ? (
-            <p className="muted" style={{ marginTop: 0 }}>
+            <p style={{ marginTop: 0, color: "var(--danger)" }}>
               ⚠ {t("accounts.removed")}{" "}
               <Link href="/customizations">{t("accounts.upgrade")}</Link>
             </p>
           ) : it.loginRequired ? (
-            <p className="muted" style={{ marginTop: 0 }}>
+            <p style={{ marginTop: 0, color: "var(--danger)" }}>
               ⚠ {t("accounts.loginRequired")}
             </p>
           ) : !it.syncAllowed ? (
-            <p className="muted" style={{ marginTop: 0 }}>
+            <p style={{ marginTop: 0, color: "var(--danger)" }}>
               ⚠ {t("accounts.syncBlocked", { limit })}{" "}
               <Link href="/customizations">{t("accounts.upgrade")}</Link>
             </p>
