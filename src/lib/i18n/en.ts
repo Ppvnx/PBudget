@@ -269,6 +269,22 @@ const en = {
   "cust.delete.help":
     "Cancels your subscription, disconnects your banks from Plaid, and erases all your data. This can't be undone.",
 
+  "cust.nav.agent": "Agent access",
+  "cust.agent.help":
+    "Let an AI agent work through Review for you over MCP. It can read your accounts, transactions, vendors and review queue, and do only what the Review and Vendors pages do. It can't connect, sync, re-authenticate or remove banks, edit transactions, or change categories, billing or your account.",
+  "cust.agent.url": "MCP server URL",
+  "cust.agent.auth": "The agent sends the token as: Authorization: Bearer <token>",
+  "cust.agent.none": "No token yet.",
+  "cust.agent.created": "Token created {date}.",
+  "cust.agent.create": "Create token",
+  "cust.agent.replace": "Replace token",
+  "cust.agent.replaceConfirm": "Replace the token? Agents using the old one lose access.",
+  "cust.agent.revoke": "Revoke",
+  "cust.agent.revokeConfirm": "Revoke the token? Agents using it lose access.",
+  "cust.agent.copyNow": "Copy this token now. It won't be shown again.",
+  "cust.agent.copy": "Copy",
+  "cust.agent.copied": "Copied",
+
   // --- review v2 (F12) — add review-v2 strings within this region ---
   "review.countToday": "Today",
   "review.unmatchedTitle": "Unmatched transactions ({n})",

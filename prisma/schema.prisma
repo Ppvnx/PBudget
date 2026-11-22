@@ -54,6 +54,12 @@ model User {
 
   locale String? // "en" | "zh-Hans"; null = en
 
+  // MCP agent token (lib/mcp.ts), minted on Customizations → Agent access. Only its
+  // sha256 is kept; null = no agent access. @unique is safe here: a brand-new all-null
+  // column, added by migrate.sh's guarded `db push --accept-data-loss`.
+  mcpTokenHash      String?   @unique
+  mcpTokenCreatedAt DateTime?
+
   sessions           Session[]
   verificationTokens EmailVerificationToken[]
   emailOtps          EmailOtp[]

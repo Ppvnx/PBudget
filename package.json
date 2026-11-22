@@ -27,6 +27,7 @@
     "check:native-auth": "tsx scripts/check-native-auth.ts",
     "check:iap": "tsx scripts/check-iap.ts",
     "check:migration": "tsx scripts/check-migration.ts",
+    "check:mcp": "tsx scripts/check-mcp.ts",
     "migrate:portfolio": "tsx scripts/migrate-portfolio.ts",
     "migrate:vendors": "tsx scripts/migrate-vendors-v2.ts"
   },

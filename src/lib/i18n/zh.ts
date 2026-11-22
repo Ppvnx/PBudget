@@ -265,6 +265,22 @@ const zh: Messages = {
   "cust.delete.deleting": "正在删除…",
   "cust.delete.help": "取消您的订阅，断开与 Plaid 的银行连接，并清除您的所有数据。此操作无法撤销。",
 
+  "cust.nav.agent": "智能体访问",
+  "cust.agent.help":
+    "让 AI 智能体通过 MCP 替您处理“审核”。它可以读取您的账户、交易、商户和审核队列，并且只能执行“审核”和“商户”页面上的操作。它不能连接、同步、重新验证或移除银行，不能编辑交易，也不能更改分类、账单或您的账户。",
+  "cust.agent.url": "MCP 服务器地址",
+  "cust.agent.auth": "智能体以此方式发送令牌：Authorization: Bearer <token>",
+  "cust.agent.none": "尚未创建令牌。",
+  "cust.agent.created": "令牌创建于 {date}。",
+  "cust.agent.create": "创建令牌",
+  "cust.agent.replace": "更换令牌",
+  "cust.agent.replaceConfirm": "更换令牌？使用旧令牌的智能体将失去访问权限。",
+  "cust.agent.revoke": "撤销",
+  "cust.agent.revokeConfirm": "撤销令牌？使用它的智能体将失去访问权限。",
+  "cust.agent.copyNow": "请立即复制此令牌，它不会再次显示。",
+  "cust.agent.copy": "复制",
+  "cust.agent.copied": "已复制",
+
   // --- review v2 (F12) — add review-v2 strings within this region ---
   "review.countToday": "今日",
   "review.unmatchedTitle": "未匹配交易（{n}）",

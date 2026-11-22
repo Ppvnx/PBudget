@@ -6,6 +6,7 @@ import BillingSection from "./BillingSection";
 import MergesManager from "./MergesManager";
 import MarkedValidManager from "./MarkedValidManager";
 import CategoryOverridesManager from "./CategoryOverridesManager";
+import AgentAccess from "./AgentAccess";
 import LanguageSwitcher from "./LanguageSwitcher";
 import LogoutButton from "./LogoutButton";
 
@@ -14,8 +15,8 @@ import LogoutButton from "./LogoutButton";
 // determine a transaction's category (a seeded catch-all vendor covers the Plaid
 // categories the mapping used to). Initial tab honors the URL hash so Stripe's
 // portal return_url (#billing) lands on the right tab.
-type Tab = "categories" | "merges" | "markedValid" | "overrides" | "billing";
-const TABS: Tab[] = ["categories", "merges", "markedValid", "overrides", "billing"];
+type Tab = "categories" | "merges" | "markedValid" | "overrides" | "billing" | "agent";
+const TABS: Tab[] = ["categories", "merges", "markedValid", "overrides", "billing", "agent"];
 
 export default function Customizations() {
   const t = useT();
@@ -57,6 +58,7 @@ export default function Customizations() {
       {tab === "markedValid" && <MarkedValidManager />}
       {tab === "overrides" && <CategoryOverridesManager />}
       {tab === "billing" && <BillingSection />}
+      {tab === "agent" && <AgentAccess />}
     </div>
   );
 }

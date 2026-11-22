@@ -2,8 +2,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { User } from "@prisma/client";
 import { prisma } from "./db";
+
+// The MCP route (lib/mcp.ts) runs an allow-listed route handler AS the token's user:
+// getSessionUser answers from here before the cookie. Only lib/mcp.ts calls .run().
+export const actingUser = new AsyncLocalStorage<User>();
 
 const COOKIE = "pb_session";
 // Exported for the OAuth callbacks, which set the session cookie on their own
@@ -85,7 +90,23 @@ export async function destroySession(): Promise<void> {
   cookies().delete(COOKIE);
 }
 
+// One MCP token per user (Customizations → Agent access). Only its sha256 is stored, so
+// the plaintext is shown once; minting again replaces it and the old one stops working.
+export async function mintMcpToken(userId: string): Promise<{ token: string; createdAt: Date }> {
+  const token = "pbm_" + crypto.randomBytes(32).toString("hex");
+  const createdAt = new Date();
+  await prisma.user.update({ where: { id: userId }, data: { mcpTokenHash: hashCode(token), mcpTokenCreatedAt: createdAt } });
+  return { token, createdAt };
+}
+
+export async function mcpTokenUser(authorization: string | null): Promise<User | null> {
+  const token = /^Bearer\s+(pbm_[0-9a-f]{64})$/.exec(authorization ?? "")?.[1];
+  return token ? prisma.user.findUnique({ where: { mcpTokenHash: hashCode(token) } }) : null;
+}
+
 export async function getSessionUser(): Promise<User | null> {
+  const acting = actingUser.getStore();
+  if (acting) return acting;
   const token = cookies().get(COOKIE)?.value;
   if (!token) return null;
   const session = await prisma.session.findUnique({ where: { token }, include: { user: true } });
