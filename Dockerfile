@@ -1,5 +1,6 @@
 # PBudget — Next.js + Prisma. Single-stage for reliability (homelab scale):
-# keep node_modules so the prisma + next CLIs are available at container start.
+# keep node_modules so the next CLI serves and the prisma CLI is there for
+# scripts/migrate.sh (run once per deploy as a Job, never at container start).
 FROM node:22-slim
 
 # Prisma needs openssl at runtime.
@@ -27,6 +28,6 @@ RUN npm run build
 ENV NODE_ENV=production
 EXPOSE 5300
 
-# k8s overrides this to also source /vault/secrets/*. `prisma db push` makes the
-# schema match on first boot (idempotent); then start the server.
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node_modules/.bin/next start -p 5300"]
+# k8s overrides this to also source /vault/secrets/*. Start only: the schema step
+# is scripts/migrate.sh, which the deploy runs once as a Job before the pods roll.
+CMD ["node_modules/.bin/next", "start", "-p", "5300"]
