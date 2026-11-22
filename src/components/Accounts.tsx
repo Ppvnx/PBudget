@@ -310,14 +310,13 @@ export default function Accounts({
         <PlaidOpener
           token={reauth.token}
           onExit={() => setReauth(null)}
-          onSuccess={() =>
-            run(async () => {
-              const itemId = reauth.itemId;
-              setReauth(null);
-              await postJson("/api/plaid/item/sync", { item_id: itemId });
-              router.refresh();
-            })
-          }
+          onSuccess={() => {
+            // Same path as the Sync button, so the slow post-reauth sync shows the
+            // status dialog + progress bar instead of just greyed-out buttons.
+            const itemId = reauth.itemId;
+            setReauth(null);
+            sync(itemId);
+          }}
         />
       )}
 
@@ -337,7 +336,12 @@ function SyncStatusDialog({ status, onClose }: { status: SyncStatus; onClose: ()
       <div className="card" style={{ maxWidth: 460, width: "100%", margin: 0 }} onClick={(e) => e.stopPropagation()}>
         <div className="card-header">{t("accounts.sync.dialogTitle")}</div>
 
-        {status.phase === "running" && <p className="muted" style={{ marginTop: 0 }}>{t("accounts.sync.running")}</p>}
+        {status.phase === "running" && (
+          <>
+            <p className="muted" style={{ marginTop: 0 }}>{t("accounts.sync.running")}</p>
+            <div className="progress" role="progressbar" aria-label={t("accounts.sync.running")} />
+          </>
+        )}
 
         {status.phase === "done" && (
           <p style={{ marginTop: 0 }}>✓ {t("accounts.syncDone", { n: status.count })}</p>

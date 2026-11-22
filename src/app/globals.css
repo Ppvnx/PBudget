@@ -245,6 +245,16 @@ tr.clickable:hover > td { background: var(--bg-3); }
 .skeleton { background: var(--bg-3); border-radius: var(--radius); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
+/* ponytail: indeterminate — sync is one request with no progress to report; add a
+   determinate bar only if the server ever streams progress. Not <progress>: iOS WKWebView
+   draws the indeterminate one as an empty track. */
+.progress { height: 4px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.progress::after {
+  content: ""; display: block; width: 40%; height: 100%; background: var(--primary);
+  animation: indeterminate 1.2s ease-in-out infinite;
+}
+@keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
 /* Notices -------------------------------------------------------------- */
 .banner {
   background: var(--bg-2); border: 1px solid var(--border);
