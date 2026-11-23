@@ -8,6 +8,7 @@ import { I18nProvider } from "@/lib/i18n/context";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import NavLink from "@/components/NavLink";
 import UserIdBadge from "@/components/UserIdBadge";
+import JobsPanel from "@/components/JobsPanel";
 
 // Small ledger-green wordmark badge — three ascending bars (savings growing).
 function BrandMark() {
@@ -112,6 +113,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </nav>
           <main className={user ? "main main-side" : "main"}>{children}</main>
+          {user && <JobsPanel />}
         </I18nProvider>
       </body>
     </html>

@@ -68,11 +68,44 @@ model User {
   categories         TransactionCategory[]
   vendors            Vendor[]
   mcpCalls           McpCall[]
+  jobs               Job[]
 }
 
 // One MCP tools/call (lib/mcp.ts), listed on the Agent page. Kept 7 days: each call
 // prunes older rows. args/error are sealed at rest (db.ts ENCRYPTED): they can carry
 // merchant names and category reasons.
+// A background job (lib/jobs.ts): Plaid sync, full analyze, full re-match. The row is
+// what the jobs panel shows; RabbitMQ carries only its id to a pbudget-worker pod.
+// Rows go after 7 days (pg-ttl, from the column comment scripts/migrate.sh writes).
+model Job {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String // sync | analyze | rematch
+  key       String    @default("") // what "the same job" means: sync = its itemId
+  label     String    @default("") // shown in the panel (sync: the bank's name)
+  args      String    @default("{}") // JSON, sealed at rest (db.ts ENCRYPTED: a new link's access token)
+  state     String    @default("queued") // queued | running | done | failed
+  stage     String    @default("") // i18n key suffix: jobs.stage.<stage>
+  done      Int       @default(0)
+  total     Int       @default(0) // 0 = no count: the bar is indeterminate
+  result    String? // JSON
+  error     String? // JSON {error, errorType?, errorCode?, requestId?}
+  dismissed Boolean   @default(false) // a failed job closed in the panel
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  endedAt   DateTime?
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// One analyze/rematch per user at a time (lib/jobs.ts userLock).
+model JobLock {
+  userId String   @id
+  at     DateTime @default(now())
+}
+
 model McpCall {
   id        String   @id @default(cuid())
   userId    String

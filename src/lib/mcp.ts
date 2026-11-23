@@ -12,6 +12,7 @@ import type { User } from "@prisma/client";
 import { prisma } from "./db";
 import { actingUser, mcpTokenUser, MCP_HISTORY_MS } from "./auth";
 import { RULES } from "./analysis/constants";
+import { waitJob } from "./jobs";
 import { GET as reviewGet } from "@/app/api/review/route";
 import { POST as analyzePost } from "@/app/api/review/analyze/route";
 import { GET as accountTxnsGet } from "@/app/api/accounts/transactions/route";
@@ -109,7 +110,10 @@ export const TOOLS: Tool[] = [
     call(u, dashboardGet, { query: a })),
 
   // --- Review page ------------------------------------------------------------
-  tool("run_analysis", "Re-run the analyzer (auto-match, re-match, suspicion rules) — Review's Analysis button.", {}, [], (u) => call(u, analyzePost, { body: {} })),
+  tool("run_analysis", "Re-run the analyzer (auto-match, re-match, suspicion rules) — Review's Analysis button. It runs as a background job; this waits up to 45 s for its counts.", {}, [], async (u) => {
+    const { job } = await call(u, analyzePost, { body: {} });
+    return (await waitJob(job.id, 45_000)) ?? { job: job.id };
+  }),
   tool("mark_valid", "Mark suspicion flags valid (dismissed for good). Not for unmatched_transfer, unmatched or conflict items.", { flag_ids: list("flagId values from get_review") }, ["flag_ids"], async (u, a) => {
     const ids: string[] = a.flag_ids.map(String);
     // Review offers no Mark valid on an unmatched transfer (it needs a category); the route itself would allow it.

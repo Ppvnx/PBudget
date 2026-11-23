@@ -10,6 +10,8 @@ import crypto from "node:crypto";
 import { prisma } from "./db";
 import { encrypt, decrypt } from "./crypto";
 import { plaidCategoryName, deletedCategoryNames } from "./categories";
+import { enqueue, progress } from "./jobs";
+import type { PlaidItem } from "@prisma/client";
 
 // ---- Client --------------------------------------------------------------
 
@@ -122,6 +124,7 @@ export async function syncItem(
   const start = isoDate(new Date(now.getTime() - LOOKBACK_DAYS * 86400000));
 
   let offset = 0;
+  progress("fetch");
   let data = await transactionsGet(accessToken, start, end, offset);
   const itemId = data.item.item_id;
   const institutionId = data.item.institution_id;
@@ -198,9 +201,11 @@ export async function syncItem(
   let total = data.total_transactions;
   let batch = data.transactions;
   while (true) {
-    await saveTransactions(userId, batch);
+    const at = offset;
+    await saveTransactions(userId, batch, (i) => progress("save", at + i, total));
     if (offset + PAGE >= total) break;
     offset += PAGE;
+    progress("fetch");
     data = await transactionsGet(accessToken, start, end, offset);
     total = data.total_transactions;
     batch = data.transactions;
@@ -209,7 +214,7 @@ export async function syncItem(
   return { itemId, accounts: data.accounts.length, transactions: total };
 }
 
-async function saveTransactions(userId: string, txns: Transaction[]): Promise<void> {
+async function saveTransactions(userId: string, txns: Transaction[], saved: (n: number) => void): Promise<void> {
   // Ensure per-user category rows exist for every predicted category (budget 0),
   // EXCEPT names the user has deleted — those stay deleted (see DeletedCategory).
   // Transactions still display the Plaid name via resolveCategory's fallback.
@@ -228,7 +233,7 @@ async function saveTransactions(userId: string, txns: Transaction[]): Promise<vo
     });
   }
 
-  for (const t of txns) {
+  for (const [i, t] of txns.entries()) {
     const pfc = t.personal_finance_category ?? null;
     const legacy = t.category ?? null;
     let category: string | null = null;
@@ -258,6 +263,7 @@ async function saveTransactions(userId: string, txns: Transaction[]): Promise<vo
       create: { transactionId: t.transaction_id, accountId: t.account_id, ...fields },
       update: fields,
     });
+    saved(i + 1);
   }
 }
 
@@ -271,11 +277,43 @@ export async function refreshAndSync(
   const now = new Date();
   const aDayAgo = new Date(now.getTime() - 86400000);
   if (lastForceRefreshed <= aDayAgo) {
+    progress("refresh");
     await client().transactionsRefresh({ access_token: accessToken });
     await prisma.plaidItem.update({ where: { itemId }, data: { lastForceRefreshed: now } });
     await new Promise((r) => setTimeout(r, 5000));
   }
   return syncItem(userId, accessToken);
+}
+
+/** The "sync" job (lib/jobs.ts): one bank's Plaid pull, then the analyzer queued. args:
+ * itemId (refresh: the Sync button's forced refresh, at most daily; a webhook's is off),
+ * or token: a just-linked bank's access token (its item doesn't exist until this runs). */
+export async function syncJob(userId: string, a: { itemId?: string; refresh?: boolean; token?: string }) {
+  let accessToken = a.token ?? "";
+  let item: PlaidItem | null = null;
+  if (a.itemId) {
+    item = await prisma.plaidItem.findUnique({ where: { itemId: a.itemId } });
+    // removed (billing expiry) or deleted since it was queued: nothing to sync
+    if (!item || item.userId !== userId || item.disconnectedAt || !item.accessToken) return { skipped: true };
+    accessToken = decrypt(item.accessToken);
+  }
+  try {
+    const result =
+      item && a.refresh
+        ? await refreshAndSync(userId, item.itemId, accessToken, item.lastForceRefreshed)
+        : await syncItem(userId, accessToken);
+    await enqueue(userId, "analyze");
+    return result;
+  } catch (e: any) {
+    // Plaid errors ride on the axios error's response body — keep the exact
+    // type/code/message (e.message is just "Request failed with status code 400").
+    const p = e?.response?.data;
+    if (p?.error_code === "ITEM_LOGIN_REQUIRED" && item) await setLoginRequired(item.itemId, true);
+    const message = p?.error_message || p?.display_message || e?.message || "Plaid error";
+    throw Object.assign(new Error(message), {
+      detail: { error: message, errorType: p?.error_type ?? null, errorCode: p?.error_code ?? null, requestId: p?.request_id ?? null },
+    });
+  }
 }
 
 // Flag/clear "this bank needs the user to sign in again" (Plaid ITEM webhooks, or a

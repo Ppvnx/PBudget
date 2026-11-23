@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { decrypt } from "@/lib/crypto";
-import { verifyWebhook, syncItem, setLoginRequired } from "@/lib/plaid";
-import { analyzeUser } from "@/lib/analysis/analyze";
+import { verifyWebhook, setLoginRequired } from "@/lib/plaid";
+import { enqueue } from "@/lib/jobs";
 
 // ITEM webhook codes Plaid resolves via Link update mode (our Re-auth button):
 // ERROR (usually ITEM_LOGIN_REQUIRED), and consent about to lapse.
@@ -10,11 +9,9 @@ const NEEDS_LOGIN = new Set(["ERROR", "PENDING_EXPIRATION", "PENDING_DISCONNECT"
 
 // Plaid POSTs here when an item has transaction updates. The URL is public, so the
 // ES256 JWT signature is the ONLY thing gating work onto our Plaid quota + DB —
-// verify it against the RAW body before doing anything.
-// ponytail: syncItem + analyzeUser run inline (this pod is a persistent server, not
-// Lambda). Ceiling: Plaid retries a webhook after ~10s; if a sync ever exceeds that,
-// move the work to a queue and ack immediately. Our upserts are idempotent, so a
-// retried webhook just re-syncs harmlessly.
+// verify it against the RAW body before doing anything. The sync / analyze are jobs
+// (lib/jobs.ts), so Plaid gets its 200 at once (it retries after ~10 s); a retried
+// webhook joins the sync still queued or running for that item.
 export async function POST(req: Request) {
   const raw = await req.text();
   if (!(await verifyWebhook(raw, req.headers.get("plaid-verification")))) {
@@ -32,7 +29,7 @@ export async function POST(req: Request) {
   // Only transaction updates drive a sync.
   if (webhook_type !== "TRANSACTIONS") return NextResponse.json({ received: true });
 
-  const item = await prisma.plaidItem.findUnique({ where: { itemId: item_id } });
+  const item = await prisma.plaidItem.findUnique({ where: { itemId: item_id }, include: { institution: true } });
   // Unknown, disconnected (billing expiry), or token-cleared item → nothing to sync.
   if (!item || item.disconnectedAt || !item.accessToken) return NextResponse.json({ received: true });
 
@@ -46,12 +43,16 @@ export async function POST(req: Request) {
         where: { transactionId: { in: removed_transactions }, account: { itemId: item_id } },
       });
     }
+    await enqueue(item.userId, "analyze");
   } else {
-    // INITIAL_UPDATE | HISTORICAL_UPDATE | DEFAULT_UPDATE — re-pull the window.
-    // Skip refreshAndSync's forced transactionsRefresh: the webhook already means
+    // INITIAL_UPDATE | HISTORICAL_UPDATE | DEFAULT_UPDATE — re-pull the window (the job
+    // queues the analyzer). No forced transactionsRefresh: the webhook already means
     // Plaid has fresh data, so there's nothing to force (and no daily throttle to fight).
-    await syncItem(item.userId, decrypt(item.accessToken));
+    await enqueue(item.userId, "sync", {
+      key: item.itemId,
+      label: item.institution.name,
+      args: { itemId: item.itemId, refresh: false },
+    });
   }
-  await analyzeUser(item.userId);
   return NextResponse.json({ received: true });
 }

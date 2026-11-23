@@ -245,10 +245,31 @@ tr.clickable:hover > td { background: var(--bg-3); }
 .skeleton { background: var(--bg-3); border-radius: var(--radius); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
-/* ponytail: indeterminate — sync is one request with no progress to report; add a
-   determinate bar only if the server ever streams progress. Not <progress>: iOS WKWebView
-   draws the indeterminate one as an empty track. */
+/* Indeterminate bar (a job stage with no count); .progress-bar is the determinate one.
+   Not <progress>: iOS WKWebView draws the indeterminate one as an empty track. */
 .progress { height: 4px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.progress-bar { height: 4px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.progress-bar > span { display: block; height: 100%; background: var(--primary); transition: width 0.4s ease; }
+
+/* Background jobs panel (JobsPanel): the content's bottom-left corner — right of the
+   desktop rail, above the mobile tab bar. */
+.jobs-panel {
+  position: fixed; left: 248px; bottom: 16px; z-index: 40;
+  width: 320px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.job-card {
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-md); padding: 10px 12px; font-size: 13px;
+}
+.job-stage { font-size: 12px; margin: 4px 0 6px; }
+.job-error {
+  font-family: monospace; font-size: 12px; background: var(--bg-3); border-radius: 6px;
+  padding: 8px 10px; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto;
+}
+@media (max-width: 1024px) {
+  .jobs-panel { left: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
 .progress::after {
   content: ""; display: block; width: 40%; height: 100%; background: var(--primary);
   animation: indeterminate 1.2s ease-in-out infinite;

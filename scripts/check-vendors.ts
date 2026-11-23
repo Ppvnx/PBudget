@@ -148,6 +148,7 @@ async function main(): Promise<void> {
 
   // --- Reorder flips the winner --------------------------------------------
   await reorderVendors(USER, [v2.id, v1.id]);
+  await rematchUser(USER); // the route queues this as a job
   check((await vendorIdOfTxn()) === v2.id, "reorder: flips the winner to v2");
   check(!!(await openFlag("vendor_conflict")), "reorder: conflict still open while both overlap");
 

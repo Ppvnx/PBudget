@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { gate, num } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import { createMergeGroup } from "@/lib/analysis/merge";
-import { analyzeUser } from "@/lib/analysis/analyze";
+import { enqueue } from "@/lib/jobs";
 import { splitParentIds } from "@/lib/splits";
 
 // GET /api/merge — all confirmed merge groups (the "Merged groups" tab in
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
   }
 
   const group = await createMergeGroup(userId, ids, { status: "confirmed" });
-  await analyzeUser(userId); // evaluate the new group per the merge rules
+  await enqueue(userId, "analyze"); // evaluate the new group per the merge rules (a job)
 
   return NextResponse.json(
     {

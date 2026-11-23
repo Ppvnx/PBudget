@@ -3,7 +3,6 @@ import { prisma } from "../db";
 import { plaidCategoryName } from "../categories";
 import { normalizeVendor, plaidPrimary } from "./vendor";
 import { primaryLeg, netAmount } from "./groups";
-import { analyzeUser } from "./analyze";
 
 // Create a merge group over legIds (auto-match `auto` or manual merge `confirmed`,
 // FR3). Derives title/vendor/category/date from the primary leg (largest outflow),
@@ -62,8 +61,8 @@ export async function createMergeGroup(
 // Dissolve a group (FR3). Remember the sorted-leg key BEFORE re-analysis so
 // auto-match never recreates this exact set (a manual re-merge stays possible),
 // resolve the group's own OPEN flags (the group ceases to exist), delete it
-// (legs cascade), then re-run the analyzer so the freed legs get re-evaluated —
-// transfer-like legs get unmatched_transfer. Dismissed flags stay dismissed
+// (legs cascade). The caller then queues the analyzer so the freed legs get
+// re-evaluated — transfer-like legs get unmatched_transfer. Dismissed flags stay dismissed
 // (permanence, FR4), since the
 // analyzer never reopens a dismissed flag.
 export async function dissolveGroup(userId: string, groupId: string): Promise<void> {
@@ -83,6 +82,5 @@ export async function dissolveGroup(userId: string, groupId: string): Promise<vo
     data: { status: "resolved", resolvedAt: new Date() },
   });
   await prisma.mergeGroup.delete({ where: { id: groupId } });
-
-  await analyzeUser(userId);
+  // Re-flagging the freed legs is the analyzer's: the caller queues it (a job).
 }

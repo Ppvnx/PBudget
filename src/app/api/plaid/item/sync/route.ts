@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { gate } from "@/lib/guard";
 import { prisma } from "@/lib/db";
-import { decrypt } from "@/lib/crypto";
-import { refreshAndSync, setLoginRequired } from "@/lib/plaid";
 import { canSyncItem, upgradeCTA } from "@/lib/stripe";
-import { analyzeUser } from "@/lib/analysis/analyze";
+import { enqueue } from "@/lib/jobs";
 
 export async function POST(req: Request) {
   const g = await gate({ verified: true });
@@ -12,7 +10,7 @@ export async function POST(req: Request) {
   const { item_id } = await req.json().catch(() => ({}));
   if (!item_id) return NextResponse.json({ error: "Missing item_id" }, { status: 400 });
 
-  const item = await prisma.plaidItem.findUnique({ where: { itemId: item_id } });
+  const item = await prisma.plaidItem.findUnique({ where: { itemId: item_id }, include: { institution: true } });
   if (!item || item.userId !== g.user!.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -27,30 +25,12 @@ export async function POST(req: Request) {
   if (!sync.ok) {
     return NextResponse.json(upgradeCTA(g.user!.plan, sync.used), { status: 402 });
   }
-  try {
-    const result = await refreshAndSync(
-      g.user!.id,
-      item.itemId,
-      decrypt(item.accessToken),
-      item.lastForceRefreshed
-    );
-    // FR1: analyze the user's history after the upserts. First run analyzes all
-    // existing history — nothing is grandfathered.
-    await analyzeUser(g.user!.id);
-    return NextResponse.json({ result });
-  } catch (e: any) {
-    // Plaid errors ride on the axios error's response body — surface the exact
-    // type/code/message (e.message is just "Request failed with status code 400").
-    const p = e?.response?.data;
-    if (p?.error_code === "ITEM_LOGIN_REQUIRED") await setLoginRequired(item.itemId, true);
-    return NextResponse.json(
-      {
-        error: p?.error_message || p?.display_message || e?.message || "Plaid error",
-        errorType: p?.error_type ?? null,
-        errorCode: p?.error_code ?? null,
-        requestId: p?.request_id ?? null,
-      },
-      { status: 500 }
-    );
-  }
+  // The pull itself (minutes: Plaid's refresh) runs on a worker, then the analyzer
+  // (FR1) — lib/plaid.ts syncJob. The jobs panel follows it.
+  const job = await enqueue(g.user!.id, "sync", {
+    key: item.itemId,
+    label: item.institution.name,
+    args: { itemId: item.itemId, refresh: true },
+  });
+  return NextResponse.json({ job });
 }

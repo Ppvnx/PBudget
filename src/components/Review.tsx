@@ -6,6 +6,7 @@ import VendorEditor, { type Vendor, type Condition, type Refs } from "./VendorEd
 import SplitDialog, { type SplitParent } from "./SplitDialog";
 import { Chip } from "./vendorSummary";
 import { useT } from "@/lib/i18n/context";
+import { jobsChanged, JOB_DONE } from "./JobsPanel";
 
 // Review v2 — the funnel's human hub (F12, FR6). One sectioned page over
 // GET /api/review: a counters row spanning every open item, then Unmatched,
@@ -331,21 +332,25 @@ export default function Review() {
     setModal(null);
     reload();
   };
-  // Run the full analyzer on demand (auto-match + re-match + suspicion rules) so
-  // config/data changes surface without a Plaid sync. Reload picks up the results.
+  // Queue the full analyzer (auto-match + re-match + suspicion rules) so config/data
+  // changes surface without a Plaid sync. A background job: the jobs panel shows it and
+  // its counts, and the queue reloads when any job ends (below).
   const analyze = async () => {
-    setBusy(true);
     setError("");
     setNote("");
     try {
-      const res = await postJson("/api/review/analyze");
-      setNote(t("review.analyzeDone", { groups: res.pendingGroups, flags: res.openFlags }));
-      reload();
+      await postJson("/api/review/analyze");
+      jobsChanged();
     } catch (e: any) {
       setError(e.message);
-      setBusy(false);
     }
   };
+  // A sync, analyze or rematch (or a merge/dissolve's analyze) rewrote the queue.
+  useEffect(() => {
+    window.addEventListener(JOB_DONE, reload);
+    return () => window.removeEventListener(JOB_DONE, reload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // reload only bumps a key: the first one is as good as any
 
   // Confirmed merges moved to Customizations, so they no longer keep Review from
   // showing "all clear" — only splits still count as browsable here.

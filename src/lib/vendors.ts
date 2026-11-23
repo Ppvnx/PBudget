@@ -4,7 +4,7 @@
 // evaluators and the regex validator all come from F1's match.ts.
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { validateRegex, rematchUser, rematchAfterVendorChange } from "./analysis/match";
+import { validateRegex, rematchAfterVendorChange } from "./analysis/match";
 import { iconForLink, iconForImageUrl } from "./favicon";
 import { normalizeStr } from "./analysis/vendor";
 import { serializeDays, effectiveDays } from "./dayofmonth";
@@ -487,5 +487,5 @@ export async function reorderVendors(userId: string, orderedIds: unknown): Promi
     for (let i = 0; i < ids.length; i++)
       await tx.vendor.update({ where: { id: ids[i] }, data: { priority: i } });
   });
-  await rematchUser(userId);
+  // The full rematch the new order needs is the caller's (the route queues it as a job).
 }

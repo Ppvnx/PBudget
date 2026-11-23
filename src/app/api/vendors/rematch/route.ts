@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { gate } from "@/lib/guard";
-import { rematchUser } from "@/lib/analysis/match";
+import { enqueue } from "@/lib/jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 // Save button only touches the edited vendor's + unmatched txns (incremental, fast);
 // this is the manual "re-resolve everything" escape hatch — e.g. after broadening a
 // vendor so it should reclaim txns currently held by a catch-all bucket. Surfaced on
-// the Accounts page. Still one bounded pass (batched writes), not per-txn queries.
+// the Accounts page. One bounded pass (batched writes), but ~9 s over a few thousand
+// txns, so it's a job (lib/jobs.ts) the panel follows.
 export async function POST() {
   const g = await gate({ verified: true });
   if (g.error) return g.error;
-  await rematchUser(g.user!.id);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ job: await enqueue(g.user!.id, "rematch") });
 }
