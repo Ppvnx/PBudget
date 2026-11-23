@@ -90,7 +90,10 @@ export async function destroySession(): Promise<void> {
   cookies().delete(COOKIE);
 }
 
-// One MCP token per user (Customizations → Agent access). Only its sha256 is stored, so
+// How long the Agent page keeps an agent's tool calls (owner, 2026-11-22).
+export const MCP_HISTORY_MS = 7 * 86_400_000;
+
+// One MCP token per user (the Agent page, /agent). Only its sha256 is stored, so
 // the plaintext is shown once; minting again replaces it and the old one stops working.
 export async function mintMcpToken(userId: string): Promise<{ token: string; createdAt: Date }> {
   const token = "pbm_" + crypto.randomBytes(32).toString("hex");

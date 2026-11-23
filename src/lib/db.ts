@@ -9,6 +9,7 @@ import { encrypt, maybeDecrypt } from "./crypto";
 const ENCRYPTED: Record<string, readonly string[]> = {
   PlaidTransaction: ["name", "merchantName", "category", "website"],
   PlaidAccount: ["name", "officialName"],
+  McpCall: ["args", "error"],
 };
 const ENCRYPTED_FIELDS = new Set(Object.values(ENCRYPTED).flat());
 

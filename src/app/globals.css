@@ -336,6 +336,8 @@ input.budget { width: 92px; padding: 6px 8px; }
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .nav-ic, .nav-ic svg { width: 20px; height: 20px; }
+  /* Rail-only entries (Agent): the bar stays exactly 5 tabs. */
+  .nav-link.nav-desktop { display: none; }
   /* The rail is gone, so its 232px gutter must go too; desktop spacing otherwise
      stays, and the bottom pad clears the tab bar + home indicator. Phone-tight
      padding belongs at 640, not here — a tablet should not read as a big phone. */

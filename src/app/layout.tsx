@@ -98,6 +98,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <NavLink href="/accounts" label={t(locale, "nav.accounts")} icon="accounts" />
                 <NavLink href="/vendors" label={t(locale, "cust.nav.vendors")} icon="vendors" />
                 <NavLink href="/customizations" label={t(locale, "nav.customizations")} icon="customizations" />
+                <NavLink href="/agent" label={t(locale, "nav.agent")} icon="agent" desktopOnly />
                 <div className="spacer" />
                 <UserIdBadge id={user.id} />
               </>

@@ -10,7 +10,7 @@
 // pinned by scripts/check-mcp.ts.
 import type { User } from "@prisma/client";
 import { prisma } from "./db";
-import { actingUser, mcpTokenUser } from "./auth";
+import { actingUser, mcpTokenUser, MCP_HISTORY_MS } from "./auth";
 import { RULES } from "./analysis/constants";
 import { GET as reviewGet } from "@/app/api/review/route";
 import { POST as analyzePost } from "@/app/api/review/analyze/route";
@@ -190,13 +190,25 @@ function badArgs(t: Tool, a: unknown) {
   return bad.length ? `${t.name}: ${bad.join("; ")}` : null;
 }
 
+// The Agent page's history: one row per call, 7 days. Pruned on every call (no cron).
+// ponytail: rows outlive 7 days only while NO user's agent calls anything; add a sweep if that matters.
+// Never throws: a write tool already ran, and a failed answer would make the agent retry it.
+async function logCall(userId: string, tool: string, args: unknown, error: string | null) {
+  try {
+    await prisma.mcpCall.create({ data: { userId, tool, args: JSON.stringify(args).slice(0, 2000), error: error?.slice(0, 500) ?? null } });
+    await prisma.mcpCall.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - MCP_HISTORY_MS) } } });
+  } catch (e) {
+    console.error("mcp call log", e);
+  }
+}
+
 const rpc = (id: unknown, body: object, status = 200) => Response.json({ jsonrpc: "2.0", id: id ?? null, ...body }, { status });
 
 /** One JSON-RPC message in, one answer out. */
 export async function handle(req: Request): Promise<Response> {
   const user = await mcpTokenUser(req.headers.get("authorization"));
   if (!user?.emailVerified)
-    return rpc(null, { error: { code: -32001, message: "unauthorized: create a token on PBudget → Customizations → Agent access" } }, 401);
+    return rpc(null, { error: { code: -32001, message: "unauthorized: create a token on PBudget's Agent page (/agent)" } }, 401);
   let m: any;
   try {
     m = await req.json();
@@ -217,14 +229,19 @@ export async function handle(req: Request): Promise<Response> {
       const t = TOOLS.find((x) => x.name === m.params?.name);
       if (!t) return rpc(m.id, { error: { code: -32602, message: `unknown tool: ${m.params?.name}` } });
       const args = m.params.arguments ?? {};
-      const bad = badArgs(t, args);
-      if (bad) return result({ content: [{ type: "text", text: bad }], isError: true });
-      try {
-        return result({ content: [{ type: "text", text: JSON.stringify(await t.run(user, args)) }] });
-      } catch (e: any) {
-        console.error(e);
-        return result({ content: [{ type: "text", text: e?.message ?? String(e) }], isError: true });
+      let text = badArgs(t, args);
+      let isError = !!text;
+      if (!text) {
+        try {
+          text = JSON.stringify(await t.run(user, args));
+        } catch (e: any) {
+          console.error(e);
+          text = e?.message ?? String(e);
+          isError = true;
+        }
       }
+      await logCall(user.id, t.name, args, isError ? text : null);
+      return result({ content: [{ type: "text", text }], ...(isError && { isError: true }) });
     }
     default:
       return rpc(m.id, { error: { code: -32601, message: `method not found: ${m.method}` } });

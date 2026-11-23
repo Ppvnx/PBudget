@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 // One left-rail item: icon + label, highlighted when its route is active. Kept as
 // a client component so it can read the current path; the layout passes a stable
 // icon key + already-localized label so nothing here needs i18n.
-type IconName = "dashboard" | "review" | "accounts" | "vendors" | "customizations";
+type IconName = "dashboard" | "review" | "accounts" | "vendors" | "customizations" | "agent";
 
 // Lucide-style stroke glyphs (currentColor so the active pill tints them).
 const ICONS: Record<IconName, React.ReactNode> = {
@@ -31,6 +31,12 @@ const ICONS: Record<IconName, React.ReactNode> = {
       <circle cx="8.5" cy="8.5" r="1.4" />
     </>
   ),
+  agent: (
+    <>
+      <rect x="5" y="8" width="14" height="11" rx="2.5" />
+      <path d="M12 4v4M9.5 13h.01M14.5 13h.01M9.5 16h5" />
+    </>
+  ),
   customizations: (
     <>
       <path d="M4 7h11M4 12h16M4 17h8" />
@@ -40,11 +46,12 @@ const ICONS: Record<IconName, React.ReactNode> = {
   ),
 };
 
-export default function NavLink({ href, label, icon }: { href: string; label: string; icon: IconName }) {
+// desktopOnly: left rail only, never the bottom tab bar (globals.css keeps that at exactly 5).
+export default function NavLink({ href, label, icon, desktopOnly }: { href: string; label: string; icon: IconName; desktopOnly?: boolean }) {
   const path = usePathname();
   const active = path === href || path?.startsWith(href + "/");
   return (
-    <Link href={href} className={active ? "nav-link active" : "nav-link"} aria-current={active ? "page" : undefined}>
+    <Link href={href} className={`nav-link${active ? " active" : ""}${desktopOnly ? " nav-desktop" : ""}`} aria-current={active ? "page" : undefined}>
       <span className="nav-ic" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
           {ICONS[icon]}

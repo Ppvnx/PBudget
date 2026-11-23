@@ -54,7 +54,7 @@ model User {
 
   locale String? // "en" | "zh-Hans"; null = en
 
-  // MCP agent token (lib/mcp.ts), minted on Customizations → Agent access. Only its
+  // MCP agent token (lib/mcp.ts), minted on the Agent page (/agent). Only its
   // sha256 is kept; null = no agent access. @unique is safe here: a brand-new all-null
   // column, added by migrate.sh's guarded `db push --accept-data-loss`.
   mcpTokenHash      String?   @unique
@@ -67,6 +67,23 @@ model User {
   items              PlaidItem[]
   categories         TransactionCategory[]
   vendors            Vendor[]
+  mcpCalls           McpCall[]
+}
+
+// One MCP tools/call (lib/mcp.ts), listed on the Agent page. Kept 7 days: each call
+// prunes older rows. args/error are sealed at rest (db.ts ENCRYPTED): they can carry
+// merchant names and category reasons.
+model McpCall {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool      String
+  args      String // JSON, truncated
+  error     String? // null = ok
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model Session {
