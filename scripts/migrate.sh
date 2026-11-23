@@ -23,3 +23,5 @@ fi
 DATABASE_URL="$DIRECT_DATABASE_URL" npx prisma db push --accept-data-loss --skip-generate
 # Job rows (lib/jobs.ts) go after 7 days: Setups' pg-ttl CronJob deletes by this comment.
 echo "COMMENT ON COLUMN \"Job\".\"createdAt\" IS 'ttl 7 days';" | npx prisma db execute --url "$DIRECT_DATABASE_URL" --stdin
+# Screenshot images (lib/screenshots.ts) go after 30 days; the rows read from them stay.
+echo "COMMENT ON COLUMN \"ScreenshotImage\".\"createdAt\" IS 'ttl 30 days';" | npx prisma db execute --url "$DIRECT_DATABASE_URL" --stdin

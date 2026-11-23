@@ -352,6 +352,24 @@ export async function removeConnection(itemId: string, stored: string): Promise<
   });
 }
 
+// "Disconnect from Plaid" on Accounts: the same soft-delete as removeConnection, but the
+// user asked for their data at Plaid to be deleted, so Plaid must confirm the item is
+// gone — any other failure is thrown and nothing changes here. An item Plaid no longer
+// knows already is gone. Accounts + transactions stay, and screenshots still add to them.
+export async function disconnectItem(itemId: string, stored: string): Promise<void> {
+  if (stored) {
+    try {
+      await client().itemRemove({ access_token: decrypt(stored) });
+    } catch (e: any) {
+      const p = e?.response?.data;
+      if (p?.error_code !== "ITEM_NOT_FOUND" && p?.error_code !== "INVALID_ACCESS_TOKEN") {
+        throw new Error(p?.error_message || p?.display_message || e?.message || "Plaid error");
+      }
+    }
+  }
+  await prisma.plaidItem.update({ where: { itemId }, data: { disconnectedAt: new Date(), accessToken: "" } });
+}
+
 // Permanently delete a connection (user-initiated on Accounts): revoke it at Plaid
 // (best-effort), then HARD-delete the item row. Cascade removes its accounts and
 // their transactions (and the categoryOverride/reason columns that ride on each txn).

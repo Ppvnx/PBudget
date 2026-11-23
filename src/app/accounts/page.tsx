@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getLocale } from "@/lib/i18n/server";
 import { canAddConnection, entitledConnections, upgradeCTA } from "@/lib/stripe";
 import Accounts from "@/components/Accounts";
+import { screenshotsAllowed } from "@/lib/screenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default async function AccountsPage() {
       plan={user.plan}
       limit={Number.isFinite(entitlement) ? entitlement : 0}
       locale={await getLocale(user)}
+      screenshots={screenshotsAllowed(user)}
     />
   );
 }

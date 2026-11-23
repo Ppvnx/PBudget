@@ -29,6 +29,7 @@
     "check:migration": "tsx scripts/check-migration.ts",
     "check:mcp": "tsx scripts/check-mcp.ts",
     "check:jobs": "tsx scripts/check-jobs.ts",
+    "check:screenshots": "tsx scripts/check-screenshots.ts",
     "migrate:portfolio": "tsx scripts/migrate-portfolio.ts",
     "migrate:vendors": "tsx scripts/migrate-vendors-v2.ts"
   },

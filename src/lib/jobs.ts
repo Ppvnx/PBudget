@@ -1,5 +1,5 @@
 // Background jobs: everything slow runs off the request — a Plaid sync, a full analyze,
-// a full re-match. Each is a Job row (state, stage, progress: what the jobs panel in the
+// a full re-match, Gemini reading a screenshot. Each is a Job row (state, stage, progress: what the jobs panel in the
 // corner shows) plus a message carrying only its id on RabbitMQ (vhost pbudget, quorum
 // queue "jobs"), consumed by the pbudget-worker pods (src/worker.ts) that KEDA scales on
 // the queue's depth (Setups config/k8s/pbudget). A message is acked only when its job has
@@ -11,7 +11,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import amqp from "amqplib";
 import { prisma } from "./db";
 
-export type Kind = "sync" | "analyze" | "rematch";
+export type Kind = "sync" | "analyze" | "rematch" | "screenshot";
 export const ACTIVE = ["queued", "running"];
 const QUEUE = "jobs";
 const QUEUE_ARGS = { durable: true, arguments: { "x-queue-type": "quorum" } };
@@ -35,6 +35,9 @@ const RUN: Record<Kind, (userId: string, a: any) => Promise<unknown>> = {
   analyze: (userId) =>
     userLock(userId, async () => {
       progress("analyze");
+      // Screenshot transactions first: they are recomputed from the user's screenshots
+      // (lib/screenshots.ts), and the analyzer then matches them like any other row.
+      await (await import("./screenshots")).reconcileUser(userId);
       await (await import("./analysis/analyze")).analyzeUser(userId);
       // What Review's Analysis button used to answer with; the panel shows it.
       const [pendingGroups, openFlags] = await Promise.all([
@@ -48,6 +51,7 @@ const RUN: Record<Kind, (userId: string, a: any) => Promise<unknown>> = {
       progress("rematch");
       await (await import("./analysis/match")).rematchUser(userId);
     }),
+  screenshot: async (userId, a) => (await import("./screenshots")).readJob(userId, a),
 };
 
 /** Queue a job and answer at once with its id. Asking again joins the same job while it

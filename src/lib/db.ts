@@ -11,6 +11,8 @@ const ENCRYPTED: Record<string, readonly string[]> = {
   PlaidAccount: ["name", "officialName"],
   McpCall: ["args", "error"],
   Job: ["args"],
+  Screenshot: ["rows", "error"],
+  ScreenshotImage: ["image"],
 };
 const ENCRYPTED_FIELDS = new Set(Object.values(ENCRYPTED).flat());
 

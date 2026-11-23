@@ -5,6 +5,7 @@ import Link from "next/link";
 import PlaidOpener from "./PlaidOpener";
 import { VendorIcon } from "./VendorIcon";
 import TransactionBrowser from "./TransactionBrowser";
+import ScreenshotPanel from "./ScreenshotPanel";
 import { jobsChanged } from "./JobsPanel";
 import { useT } from "@/lib/i18n/context";
 import type { Locale } from "@/lib/i18n";
@@ -23,7 +24,7 @@ type ItemLite = {
   institutionLogo: string | null;
   lastUpdated: string;
   syncAllowed: boolean;
-  disconnected: boolean; // connection removed on billing expiry (data preserved)
+  disconnected: boolean; // not connected to Plaid: disconnected by the user or on billing expiry (data preserved)
   loginRequired: boolean; // Plaid says the bank needs the user to sign in again
   accounts: AccountLite[];
 };
@@ -54,12 +55,14 @@ export default function Accounts({
   plan,
   limit,
   locale,
+  screenshots,
 }: {
   items: ItemLite[];
   connect: Connect;
   plan: string;
   limit: number;
   locale: Locale;
+  screenshots: boolean; // may add screenshots (lib/screenshots.ts screenshotsAllowed)
 }) {
   const router = useRouter();
   const t = useT();
@@ -67,7 +70,7 @@ export default function Accounts({
   const [reauth, setReauth] = useState<{ itemId: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [openAccount, setOpenAccount] = useState<string | null>(null);
+  const [openAccount, setOpenAccount] = useState<{ id: string; view: "browse" | "shots" } | null>(null);
   const [note, setNote] = useState("");
   // A limit hit surfaced from a live 402 (defensive — the server pre-computes the
   // CTA, so the button is already replaced when at the limit).
@@ -117,6 +120,18 @@ export default function Accounts({
       await postJson("/api/plaid/item/remove", { item_id: itemId });
       router.refresh();
       setNote(t("accounts.removeDone", { name }));
+    });
+  };
+
+  // Disconnect from Plaid: the item is removed at Plaid (its data there deleted); every
+  // account + transaction stays here, and screenshots still add to them.
+  const disconnect = (itemId: string, name: string) => {
+    if (!window.confirm(t("accounts.disconnectConfirm", { name }))) return;
+    run(async () => {
+      setNote("");
+      await postJson("/api/plaid/item/disconnect", { item_id: itemId });
+      router.refresh();
+      setNote(t("accounts.disconnectDone", { name }));
     });
   };
 
@@ -190,6 +205,11 @@ export default function Accounts({
                   {t("accounts.reauth")}
                 </button>
               )}
+              {!it.disconnected && (
+                <button className="btn btn-sm" disabled={busy} onClick={() => disconnect(it.itemId, it.institutionName)}>
+                  {t("accounts.disconnect")}
+                </button>
+              )}
               <button
                 className="btn btn-sm btn-ghost"
                 style={{ color: "var(--danger)" }}
@@ -231,7 +251,8 @@ export default function Accounts({
             </thead>
             <tbody>
               {it.accounts.map((a) => {
-                const open = openAccount === a.accountId;
+                const view = openAccount?.id === a.accountId ? openAccount.view : null;
+                const toggle = (v: "browse" | "shots") => setOpenAccount(view === v ? null : { id: a.accountId, view: v });
                 return (
                   <Fragment key={a.accountId}>
                     <tr>
@@ -239,18 +260,26 @@ export default function Accounts({
                       <td>{a.current == null ? "" : `${a.currency ?? ""} ${a.current.toFixed(2)}`.trim()}</td>
                       <td>{a.transactionCount}</td>
                       <td style={{ textAlign: "right" }}>
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => setOpenAccount(open ? null : a.accountId)}
-                        >
-                          {open ? t("accounts.hide") : t("accounts.browse")}
-                        </button>
+                        <div className="row wrap" style={{ gap: 6, justifyContent: "flex-end" }}>
+                          <button className="btn btn-sm" onClick={() => toggle("browse")}>
+                            {view === "browse" ? t("accounts.hide") : t("accounts.browse")}
+                          </button>
+                          {screenshots && (
+                            <button className="btn btn-sm" onClick={() => toggle("shots")}>
+                              {view === "shots" ? t("accounts.hide") : t("accounts.screenshots")}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                    {open && (
+                    {view && (
                       <tr>
                         <td colSpan={4} style={{ background: "var(--bg)" }}>
-                          <TransactionBrowser accountId={a.accountId} locale={locale} />
+                          {view === "browse" ? (
+                            <TransactionBrowser accountId={a.accountId} locale={locale} />
+                          ) : (
+                            <ScreenshotPanel accountId={a.accountId} currency={a.currency} />
+                          )}
                         </td>
                       </tr>
                     )}

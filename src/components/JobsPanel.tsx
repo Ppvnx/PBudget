@@ -81,6 +81,7 @@ export default function JobsPanel() {
     if (j.kind === "sync" && j.result?.transactions != null) return t("accounts.syncDone", { n: j.result.transactions });
     if (j.kind === "analyze" && j.result) return t("review.analyzeDone", { groups: j.result.pendingGroups, flags: j.result.openFlags });
     if (j.kind === "rematch") return t("accounts.rematchDone");
+    if (j.kind === "screenshot" && j.result?.rows != null) return t("jobs.screenshotDone", { n: j.result.rows });
     return t("jobs.done");
   };
 

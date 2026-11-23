@@ -60,6 +60,10 @@ model User {
   mcpTokenHash      String?   @unique
   mcpTokenCreatedAt DateTime?
 
+  // When the user allowed screenshots to be sent to Google Gemini (Apple 5.1.1(i):
+  // asked in-app, before the first one is sent). null = not asked / not allowed.
+  aiConsentAt DateTime?
+
   sessions           Session[]
   verificationTokens EmailVerificationToken[]
   emailOtps          EmailOtp[]
@@ -69,6 +73,7 @@ model User {
   vendors            Vendor[]
   mcpCalls           McpCall[]
   jobs               Job[]
+  screenshots        Screenshot[]
 }
 
 // One MCP tools/call (lib/mcp.ts), listed on the Agent page. Kept 7 days: each call
@@ -98,6 +103,38 @@ model Job {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+// A screenshot of one account's transaction list (a bank's app or website), read by
+// Gemini (lib/screenshots.ts). An account's screenshots are the evidence its screenshot
+// transactions (ids "shot_…") are recomputed from on every analyze — so deleting or
+// editing one, or adding the same one twice, always lands on the same transactions.
+model Screenshot {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId String
+  account   PlaidAccount     @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
+  sha256    String // of the uploaded bytes: the same file twice into one account is one screenshot
+  status    String           @default("reading") // reading | read | failed
+  rows      String? // JSON ShotRow[] as read, then as the user edited them; sealed (db.ts)
+  error     String? // why the last read failed; sealed (it can quote the model's answer)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  image     ScreenshotImage?
+
+  @@unique([accountId, sha256])
+  @@index([userId, createdAt])
+}
+
+// The picture itself, apart from Screenshot so pg-ttl can drop it after 30 days (the
+// column comment in scripts/migrate.sh) while the transactions read from it stay.
+model ScreenshotImage {
+  screenshotId String     @id
+  screenshot   Screenshot @relation(fields: [screenshotId], references: [id], onDelete: Cascade)
+  mime         String
+  image        String // base64; sealed at rest (db.ts ENCRYPTED)
+  createdAt    DateTime   @default(now())
 }
 
 // One analyze/rematch per user at a time (lib/jobs.ts userLock).
@@ -239,6 +276,7 @@ model PlaidAccount {
   lastUpdated     DateTime           @updatedAt
   transactions    PlaidTransaction[]
   vendorConditions VendorCondition[] // back-relation for VendorCondition.accountId (FR1)
+  screenshots     Screenshot[]
 
   @@index([itemId])
 }
