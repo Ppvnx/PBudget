@@ -268,7 +268,8 @@ tr.clickable:hover > td { background: var(--bg-3); }
   padding: 8px 10px; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto;
 }
 @media (max-width: 1024px) {
-  .jobs-panel { left: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); }
+  /* the tab bar is ~80px tall (+ the safe area): clear it by 12px */
+  .jobs-panel { left: 16px; bottom: calc(92px + env(safe-area-inset-bottom)); }
 }
 .progress::after {
   content: ""; display: block; width: 40%; height: 100%; background: var(--primary);
