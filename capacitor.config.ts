@@ -9,6 +9,10 @@ const config: CapacitorConfig = {
   appId: "com.ppvnx.pbudget",
   appName: "PBudget",
   webDir: "capacitor-www",
+  // The site is light-only, so the web view behind it must be too: unset, it follows the
+  // system appearance and every page load flashes black in dark mode (bin/ios-sim-check.sh,
+  // luma jump 208). = the site's body background.
+  backgroundColor: "#f5f6f8",
   server: {
     url: "https://pbudget.ppvnx.com",
     // Cleartext stays off — the site is HTTPS-only, so the webview must be too.
