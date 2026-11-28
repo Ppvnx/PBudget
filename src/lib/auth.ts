@@ -149,7 +149,7 @@ export type VerifyResult = "ok" | "invalid" | "no_code";
 
 // Verify a submitted OTP for the logged-in user.
 //  - no active code (none / expired / 5 tries used up) → "no_code" (request a new one)
-//  - wrong code → increment attempts, "invalid"
+//  - wrong code → "invalid" (the try is already counted)
 //  - correct code → mark emailVerified, consume the code, "ok"
 export async function verifyEmailCode(userId: string, code: string): Promise<VerifyResult> {
   const now = new Date();
@@ -157,13 +157,15 @@ export async function verifyEmailCode(userId: string, code: string): Promise<Ver
     where: { userId, expiresAt: { gt: now }, attempts: { lt: VERIFY_MAX_ATTEMPTS } },
   });
   if (!row) return "no_code";
-  if (hashCode(code) !== row.codeHash) {
-    await prisma.emailOtp.update({
-      where: { id: row.id },
-      data: { attempts: { increment: 1 } },
-    });
-    return "invalid";
-  }
+  // Take the try BEFORE comparing, in one conditional update: guesses sent in parallel
+  // each pay for theirs, so a code never gets more than 5 (read-compare-increment gave
+  // every request in a burst a free one).
+  const taken = await prisma.emailOtp.updateMany({
+    where: { id: row.id, attempts: { lt: VERIFY_MAX_ATTEMPTS } },
+    data: { attempts: { increment: 1 } },
+  });
+  if (taken.count === 0) return "no_code";
+  if (hashCode(code) !== row.codeHash) return "invalid";
   await prisma.user.update({ where: { id: userId }, data: { emailVerified: now } });
   await prisma.emailOtp.deleteMany({ where: { userId } });
   return "ok";

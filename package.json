@@ -15,6 +15,7 @@
     "check:categories": "tsx scripts/check-categories.ts",
     "check:dayofmonth": "tsx scripts/check-dayofmonth.ts",
     "check:ratelimit": "tsx scripts/check-ratelimit.ts",
+    "check:otp": "tsx scripts/check-otp.ts",
     "check:rematch": "tsx scripts/check-rematch.ts",
     "check:vendors": "tsx scripts/check-vendors.ts",
     "check:crypto": "tsx scripts/check-crypto.ts",
