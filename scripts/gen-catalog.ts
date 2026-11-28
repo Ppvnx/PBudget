@@ -1,12 +1,17 @@
-// Generate the vendor catalog (src/lib/catalog/generated.json) from yuner25699's real
+// Generate the vendor catalog (src/lib/catalog/generated.json) from the owner's real
 // vendors: name/link/category/conditions + their cached icon (data URI) when small
 // enough to embed. Buckets are NOT here — vendors.ts keeps the 3 authored catch-alls.
-// Run inside the pod; then kubectl cp /app/generated.json out to src/lib/catalog/.
+// Run inside the pod with OWNER_EMAIL set; then kubectl cp /app/generated.json out to
+// src/lib/catalog/. The output is committed to a PUBLIC repo: read it before committing,
+// and add any vendor that describes the owner rather than a merchant to PRIVATE below.
 import { writeFileSync } from "fs";
 import { prisma } from "../src/lib/db";
 
 const ICON_CAP = 8000; // bytes; skip bigger icons (fall back to a letter avatar)
-const REAL_EMAIL = "yuner25699@gmail.com";
+const REAL_EMAIL = process.env.OWNER_EMAIL;
+if (!REAL_EMAIL) throw new Error("usage: OWNER_EMAIL=you@example.com tsx scripts/gen-catalog.ts");
+// The owner's own rules (their accounts, their employer, their pay) — never published.
+const PRIVATE = new Set(["ignore", "self-transfer", "employer"]);
 
 const num = (d: unknown) => (d == null ? undefined : Number(d));
 const clean = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== "")) as T;
@@ -38,8 +43,10 @@ const clean = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o
     if (!categoryName) { skipped++; continue; } // catalog entries require a default category
     let icon: string | null = null;
     if (v.icon) { if (v.icon.length <= ICON_CAP) { icon = v.icon; iconsKept++; } else iconsDropped++; }
+    const slug = v.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (PRIVATE.has(slug)) { skipped++; continue; }
     entries.push({
-      slug: v.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+      slug,
       name: v.name,
       link: v.link ?? null,
       icon,
@@ -52,6 +59,6 @@ const clean = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o
   const path = "/app/generated.json";
   writeFileSync(path, JSON.stringify(entries, null, 0));
   const bytes = JSON.stringify(entries).length;
-  console.log(`wrote ${entries.length} entries (skipped ${skipped} no-category), icons kept ${iconsKept} dropped ${iconsDropped} (>${ICON_CAP}B)`);
+  console.log(`wrote ${entries.length} entries (skipped ${skipped} no-category or private), icons kept ${iconsKept} dropped ${iconsDropped} (>${ICON_CAP}B)`);
   console.log(`file ~${Math.round(bytes / 1024)} KB -> ${path}`);
 })().then(() => prisma.$disconnect()).catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
