@@ -10,7 +10,7 @@
 //  - every tool permission agy asks for is refused here (reading anything outside the
 //    workspace asks; writing and commands ask) — fail closed, whatever the tool;
 //  - the workspace holds nothing but the agent file, and agy gets none of this process's
-//    environment (PATH and HOME only).
+//    environment (PATH, HOME and its own self-update switch only).
 // Web search cannot be turned off; with files closed it can only see the screenshot itself,
 // whose owner is the one who sees the answer.
 import { spawn } from "node:child_process";
@@ -65,7 +65,10 @@ export function agyReadImage(o: { prompt: string; image: string; mime: string; m
   return new Promise((resolve, reject) => {
     const child = spawn("agy", ["acp", "--agent", "reader", "--log-file", "/dev/null", "--disable-telemetry"], {
       cwd: workspace,
-      env: { PATH: process.env.PATH, HOME: home } as unknown as NodeJS.ProcessEnv, // only these two (the type wants NODE_ENV)
+      // PATH and HOME only (the type wants NODE_ENV), plus self-update OFF: left on, the first
+      // call in a new pod starts agy's updater, which rewrites the pinned binary in place and
+      // kills the call racing it. "true", not "1": agy ignores 1.
+      env: { PATH: process.env.PATH, HOME: home, AGY_CLI_DISABLE_AUTO_UPDATE: "true" } as unknown as NodeJS.ProcessEnv,
     });
     let buf = "";
     let err = "";

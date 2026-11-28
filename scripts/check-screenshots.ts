@@ -129,8 +129,8 @@ process.stdin.on("data", (d) => {
       globalThis.saw = img && img.mimeType + ":" + img.data.length;
       send({ id: 900, method: "session/request_permission", params: { toolCall: { title: "File /etc/hosts" }, options: [{ optionId: "yes", kind: "allow_once" }, { optionId: "no", kind: "reject_once" }] } });
     } else if (m.id === 900) {
-      const leak = Object.keys(process.env).filter((k) => !["PATH", "HOME"].includes(k) && !k.startsWith("__CF")).join(",");
-      const desc = "COFFEE perm=" + m.result.outcome.optionId + " env=" + (leak || "clean") + " img=" + globalThis.saw;
+      const leak = Object.keys(process.env).filter((k) => !["PATH", "HOME", "AGY_CLI_DISABLE_AUTO_UPDATE"].includes(k) && !k.startsWith("__CF")).join(",");
+      const desc = "COFFEE perm=" + m.result.outcome.optionId + " env=" + (leak || "clean") + " selfupdate_off=" + process.env.AGY_CLI_DISABLE_AUTO_UPDATE + " img=" + globalThis.saw;
       send({ method: "session/update", params: { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ rows: [{ date: "2026-11-20", description: desc, amount: "3.45", direction: "out", pending: false }] }) } } } });
       send({ id: promptId, result: { stopReason: "end_turn", usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } } });
     }
@@ -174,6 +174,7 @@ async function checkRead(U: string, A: string) {
   const desc = JSON.parse(read!.rows!)[0].description as string;
   assert.match(desc, /perm=no/, "every tool permission is refused");
   assert.match(desc, /env=clean/, "agy sees no environment beyond PATH and HOME");
+  assert.match(desc, /selfupdate_off=true/, "agy's self-update is off (it would rewrite the pinned binary mid-call)");
   assert.match(desc, /img=image\/jpeg:24/, "the image goes as an ACP image block");
   const stored = await prisma.$queryRawUnsafe<{ image: string }[]>(`SELECT image FROM ScreenshotImage WHERE screenshotId = '${s.id}'`);
   assert.notEqual(stored[0].image, Buffer.from("not really a jpeg").toString("base64"), "the image is sealed at rest");
