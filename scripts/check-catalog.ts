@@ -5,6 +5,7 @@ import assert from "assert";
 import { prisma } from "../src/lib/db";
 import { CATALOG, searchCatalog, findCatalogEntry } from "../src/lib/catalog/vendors";
 import { instantiateCatalogEntry } from "../src/lib/catalog/instantiate";
+import { browseCommunity } from "../src/lib/catalog/share";
 import { rematchUser } from "../src/lib/analysis/match";
 import { RULES } from "../src/lib/analysis/constants";
 
@@ -99,6 +100,11 @@ async function main(): Promise<void> {
   // Re-instantiate Tim Hortons → suffixed name, does not collide.
   const tim2 = await instantiateCatalogEntry(USER, "tim-hortons");
   assert.equal(tim2.name, "Tim Hortons (2)", "re-instantiate suffixes the name");
+
+  // The community catalog names its Admin account by the isAdmin flag (the earliest
+  // such account), not by an address in the source.
+  await prisma.user.update({ where: { id: USER }, data: { isAdmin: true, createdAt: new Date(0) } });
+  assert.equal((await browseCommunity(USER)).adminUserId, USER, "browse names the isAdmin account as Admin");
 
   await prisma.user.deleteMany({ where: { id: USER } });
   await prisma.plaidInstitution.deleteMany({ where: { institutionId: INST } });

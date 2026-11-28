@@ -11,10 +11,6 @@ import { ensureDefaultCategories } from "../categories";
 import { serializeVendor } from "../vendors";
 import { CatalogError } from "./instantiate";
 
-// The canonical Admin account — everything it owns is shared by default, and its id
-// is public so anyone can filter the catalog to it. Also isAdmin-flagged in the DB.
-export const ADMIN_EMAIL = "yuner25699@gmail.com";
-
 type VendorWithConditions = Prisma.VendorGetPayload<{ include: { conditions: true } }>;
 
 // Browsable/adoptable iff the owner shared it OR the owner is Admin, AND it is an
@@ -36,7 +32,10 @@ export async function browseCommunity(
   requesterId: string,
   opts: { q?: string; userId?: string } = {}
 ) {
-  const admin = await prisma.user.findFirst({ where: { email: ADMIN_EMAIL }, select: { id: true } });
+  // The Admin account is the one flagged isAdmin in the DB (the first, should there ever
+  // be several): everything it owns is shared by default, and its id is public so anyone
+  // can filter the catalog to it.
+  const admin = await prisma.user.findFirst({ where: { isAdmin: true }, orderBy: { createdAt: "asc" }, select: { id: true } });
   const vendors = await prisma.vendor.findMany({
     where: { ...SHAREABLE, userId: opts.userId ? opts.userId : { not: requesterId } },
     include: { conditions: true },
