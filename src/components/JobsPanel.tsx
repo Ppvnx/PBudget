@@ -5,9 +5,10 @@ import { useT } from "@/lib/i18n/context";
 
 // Every background job of the signed-in user (lib/jobs.ts) in the bottom-left corner, on
 // every page: what it is, its stage and a bar (a real count when the job has one). Polls
-// /api/jobs every 2 s while something shows, every 30 s otherwise; a button that queues a
-// job calls jobsChanged() so its card appears at once. When a job this page saw running
-// ends, the page's server data refreshes and JOB_DONE fires for client-fetched views.
+// /api/jobs every 2 s while something shows, every 30 s otherwise (and not at all while
+// the tab is hidden with nothing going); a button that queues a job calls jobsChanged()
+// so its card appears at once. When a job this page saw running ends, the page's server
+// data refreshes and JOB_DONE fires for client-fetched views.
 type Job = {
   id: string;
   kind: string;
@@ -35,8 +36,12 @@ export default function JobsPanel() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let alive = true;
+    let idle = false; // the last answer showed nothing going
     const poll = async () => {
       clearTimeout(timer);
+      // Nothing going and nobody looking: the slow poll rests until the tab shows again.
+      // (A job still going keeps polling: a done job is listed for 30 s only.)
+      if (idle && document.hidden) return;
       const list: Job[] | null = await fetch("/api/jobs", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => d?.jobs ?? null)
@@ -61,14 +66,23 @@ export default function JobsPanel() {
           })
         );
       }
-      timer = setTimeout(poll, list?.some((j) => j.state !== "failed") ? 2000 : 30000);
+      idle = !list?.some((j) => j.state !== "failed");
+      timer = setTimeout(poll, idle ? 30000 : 2000);
+    };
+    const shown = () => void (document.hidden || poll());
+    // A poke says a job was just queued: poll for it even if the tab got hidden meanwhile.
+    const poke = () => {
+      idle = false;
+      void poll();
     };
     void poll();
-    window.addEventListener(POKE, poll);
+    window.addEventListener(POKE, poke);
+    document.addEventListener("visibilitychange", shown);
     return () => {
       alive = false;
       clearTimeout(timer);
-      window.removeEventListener(POKE, poll);
+      window.removeEventListener(POKE, poke);
+      document.removeEventListener("visibilitychange", shown);
     };
   }, [router]);
 
