@@ -26,7 +26,9 @@ RUN node -e "fetch(process.argv[1]).then(async (r) => { if (!r.ok) throw new Err
 # `prisma generate` finds the schema.
 COPY package*.json ./
 COPY prisma ./prisma
-RUN npm ci
+# The download cache is dropped in the same layer: ~/.npm was a third of this layer and
+# nothing reads it again (npx finds prisma/tsx in node_modules).
+RUN npm ci && npm cache clean --force
 
 COPY . .
 
@@ -35,7 +37,8 @@ COPY . .
 # (CLAUDE.md); DATABASE_URL comes from Vault at runtime.
 RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
 
-RUN npm run build
+# .next/cache is the compiler's own cache (~200 MB), never read by `next start`.
+RUN npm run build && rm -rf .next/cache
 
 ENV NODE_ENV=production
 EXPOSE 5300
