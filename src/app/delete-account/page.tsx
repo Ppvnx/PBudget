@@ -54,7 +54,7 @@ export default function DeleteAccountPage() {
 
       <p className="muted" style={{ marginTop: 24 }}>
         Questions about deletion? Email{" "}
-        <a href="mailto:yuner25699@gmail.com">yuner25699@gmail.com</a>. ·{" "}
+        <a href="mailto:support@ppvnx.com">support@ppvnx.com</a>. ·{" "}
         <Link href="/">Back to home</Link>
       </p>
     </div>
