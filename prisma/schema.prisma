@@ -42,12 +42,13 @@ model User {
   // verified store purchase (native). These extra fields only carry the store
   // linkage so a later renewal/cancel/refund notification maps back to this user:
   // Apple by iapOriginalTxnId (stable across renewals), Google by iapPurchaseToken.
-  // All NULLABLE (non-destructive `prisma db push`) and NOT @unique (same reason as
-  // wechatUnionId above — app-level lookup via findFirst).
+  // All NULLABLE (non-destructive `prisma db push`). The two link ids are @unique: one
+  // store purchase entitles one account (lib/iap refuseIfHeldByAnother); added by
+  // migrate.sh's guarded `db push --accept-data-loss` while no row held one.
   iapPlatform      String? // "ios" | "android"
   iapProductId     String? // the store product id that granted the current tier
-  iapOriginalTxnId String? // Apple originalTransactionId
-  iapPurchaseToken String? // Google Play purchase token
+  iapOriginalTxnId String? @unique // Apple originalTransactionId
+  iapPurchaseToken String? @unique // Google Play purchase token
 
   // Admin: exempt from the Plaid-connection limit (unlimited, no subscription).
   isAdmin              Boolean   @default(false)

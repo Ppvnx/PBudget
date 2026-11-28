@@ -155,7 +155,23 @@ export function verifyAppleTransaction(jws: string, rootPem?: string): AppleTx {
   };
 }
 
+// One store purchase entitles ONE account: a receipt another account already holds is
+// refused, so one subscription can't be replayed onto a second account (restoring onto
+// the account that holds it stays fine). The @unique link columns close the race between
+// two accounts verifying the same receipt at once.
+// ponytail: a lapsed holder keeps the link, so the same store account can't move its
+// subscription to a second PBudget account until the first is deleted. Move the link
+// when the old holder is no longer entitled if that ever matters.
+async function refuseIfHeldByAnother(
+  userId: string,
+  link: { iapOriginalTxnId: string } | { iapPurchaseToken: string }
+): Promise<void> {
+  const other = await prisma.user.findFirst({ where: { ...link, id: { not: userId } }, select: { id: true } });
+  if (other) throw new Error("purchase already linked to another account");
+}
+
 async function grantApple(userId: string, tx: AppleTx): Promise<Plan> {
+  await refuseIfHeldByAnother(userId, { iapOriginalTxnId: tx.originalTransactionId });
   const active = !tx.revoked && (tx.expiresMs === null || tx.expiresMs > Date.now());
   const plan = iapPlanForProduct(tx.productId, active);
   await setUserTier(userId, plan, active ? "active" : "canceled", {
@@ -168,9 +184,9 @@ async function grantApple(userId: string, tx: AppleTx): Promise<Plan> {
 
 // /api/iap/verify (iOS): the client hands us the signed transaction JWS. We verify
 // it end-to-end and grant to the AUTHENTICATED user (binding iapOriginalTxnId so a
-// later renewal/cancel notification maps back here).
-export async function grantFromAppleJws(userId: string, jws: string): Promise<Plan> {
-  return grantApple(userId, verifyAppleTransaction(jws));
+// later renewal/cancel notification maps back here). `rootPem` is the test's root, as above.
+export async function grantFromAppleJws(userId: string, jws: string, rootPem?: string): Promise<Plan> {
+  return grantApple(userId, verifyAppleTransaction(jws, rootPem));
 }
 
 // App Store Server Notification V2: { signedPayload } (a JWS) whose data carries a
@@ -257,6 +273,7 @@ export async function verifyGoogleSubscription(
 }
 
 async function grantGoogle(userId: string, productId: string, token: string): Promise<Plan> {
+  await refuseIfHeldByAnother(userId, { iapPurchaseToken: token });
   const { active } = await verifyGoogleSubscription(productId, token);
   const plan = iapPlanForProduct(productId, active);
   await setUserTier(userId, plan, active ? "active" : "canceled", {

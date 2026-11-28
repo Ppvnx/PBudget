@@ -7,13 +7,15 @@
 //
 // Deterministic, no network: we mint a real EC cert chain (root/intermediate/leaf)
 // with openssl, inject the test root, and sign the JWS body in Node (ES256, raw r||s).
-// Also spot-checks the geo-gated web-link compliance logic. Run: npm run check:iap
+// Also spot-checks the geo-gated web-link compliance logic, and (against the dev DB)
+// that one purchase entitles one account. Run: npm run check:iap
 import { execFileSync } from "child_process";
 import { mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { sign as ecSign, X509Certificate } from "crypto";
-import { verifyAppleJws, verifyAppleTransaction } from "../src/lib/iap";
+import { grantFromAppleJws, grantFromGooglePurchase, verifyAppleJws, verifyAppleTransaction } from "../src/lib/iap";
+import { prisma } from "../src/lib/db";
 import { showWebLink } from "../src/lib/iap_geo";
 
 let failures = 0;
@@ -115,8 +117,47 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-if (failures) {
-  console.error(`\n${failures} check(s) failed\n`);
-  process.exit(1);
+// A receipt another account already holds is refused: one subscription can't be
+// replayed onto a second account, while the account that holds it can restore it.
+async function oneAccountPerPurchase(): Promise<void> {
+  console.log("\nChecking one purchase entitles one account:");
+  process.env.IAP_PRODUCT_PRO = PRODUCT;
+  const [A, B] = ["iap-test-a", "iap-test-b"];
+  const TXN = "2000000012345678";
+  await prisma.user.deleteMany({ where: { id: { in: [A, B] } } });
+  for (const id of [A, B]) await prisma.user.create({ data: { id, email: `${id}@t.local`, passwordHash: "x" } });
+  const plan = async (id: string) => (await prisma.user.findUnique({ where: { id } }))?.plan;
+  const refusal = (p: Promise<unknown>): Promise<string> => p.then(() => "", (e) => String(e?.message ?? e));
+  const good = makeJws();
+
+  check((await grantFromAppleJws(A, good, rootPem)) === "pro", "the buyer's account gets the plan");
+  check(/another account/.test(await refusal(grantFromAppleJws(B, good, rootPem))), "iOS: the same receipt is refused on a second account");
+  check((await plan(B)) === "free", "the second account stays free");
+  check((await grantFromAppleJws(A, good, rootPem)) === "pro", "restoring onto the account that holds it still works");
+  check(
+    (await refusal(prisma.user.update({ where: { id: B }, data: { iapOriginalTxnId: TXN } }))) !== "",
+    "the link column is unique (two accounts verifying at once can't both hold it)",
+  );
+  const refunded = makeJws({ payload: { bundleId: BUNDLE, productId: PRODUCT, originalTransactionId: TXN, revocationDate: Date.now() } });
+  check((await grantFromAppleJws(A, refunded, rootPem)) === "free" && (await plan(A)) === "free", "a refund downgrades the holder");
+
+  // Android: refused before Google Play is even asked.
+  await prisma.user.update({ where: { id: A }, data: { iapPurchaseToken: "play-token-1" } });
+  check(/another account/.test(await refusal(grantFromGooglePurchase(B, PRODUCT, "play-token-1"))), "Android: the same purchase token is refused on a second account");
+
+  await prisma.user.deleteMany({ where: { id: { in: [A, B] } } });
 }
-console.log("\nAll IAP receipt-verification checks passed\n");
+
+oneAccountPerPurchase()
+  .catch((e) => {
+    console.error(e);
+    failures++;
+  })
+  .then(() => {
+    if (failures) {
+      console.error(`\n${failures} check(s) failed\n`);
+      process.exit(1);
+    }
+    console.log("\nAll IAP receipt-verification checks passed\n");
+    process.exit(0);
+  });
