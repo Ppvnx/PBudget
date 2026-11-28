@@ -1,11 +1,12 @@
 // The MCP's write boundary (owner, 2026-11-22): read everything, write only what the
 // Review and Vendors pages offer — never connect/sync/re-auth/remove a bank, edit a
 // transaction, categories, billing or the account. Pins (1) exactly which route handlers
-// lib/mcp.ts can reach, (2) the tool list, (3) no token = 401. Widening any of them must
-// be done here on purpose. No DB, no network. Run: npm run check:mcp
+// lib/mcp.ts can reach, (2) the tool list, (3) no token = 401, (4) every argument type a
+// tool declares is one badArgs checks. Widening any of them must be done here on purpose.
+// No DB, no network. Run: npm run check:mcp
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { TOOLS, handle } from "../src/lib/mcp";
+import { TOOLS, badArgs, handle } from "../src/lib/mcp";
 
 const src = readFileSync("src/lib/mcp.ts", "utf8");
 const reachable = Object.fromEntries(
@@ -42,6 +43,22 @@ assert.deepEqual(TOOLS.map((t) => t.name).sort(), [
   "search_catalog", "set_transfer_category", "split_transaction", "unsplit_transaction", "update_vendor",
   "vendor_refs", "vendor_sharing",
 ]);
+
+// badArgs holds a call to the declared types; a type it doesn't know would pass unchecked,
+// so no tool may declare one.
+for (const t of TOOLS)
+  for (const [k, p] of Object.entries(t.inputSchema.properties))
+    assert.ok(["string", "integer", "boolean", "array"].includes(p.type), `${t.name}.${k}: badArgs does not check type ${p.type}`);
+{
+  const t = { name: "t", inputSchema: { type: "object" as const, properties: { n: { type: "integer" }, s: { type: "string" }, b: { type: "boolean" }, ids: { type: "array", items: { type: "integer" } }, rows: { type: "array" } }, required: ["n"] } };
+  assert.equal(badArgs(t, { n: 1, s: "x", b: false, ids: [1, 2], rows: [{}] }), null, "well-typed arguments pass");
+  assert.match(badArgs(t, { s: "x" })!, /missing n/);
+  assert.match(badArgs(t, { n: "1" })!, /n must be an integer/);
+  assert.match(badArgs(t, { n: 1, b: "yes" })!, /b must be a boolean/);
+  assert.match(badArgs(t, { n: 1, ids: [1, "2"] })!, /ids must be an array of integers/);
+  assert.match(badArgs(t, { n: 1, rows: "x" })!, /rows must be an array/);
+  assert.match(badArgs(t, { n: 1, extra: 1 })!, /unknown argument extra/);
+}
 
 (async () => {
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });

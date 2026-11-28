@@ -176,7 +176,8 @@ export const TOOLS: Tool[] = [
 ];
 
 // Hold a call to its inputSchema (agy sometimes guesses args without reading it — media 6ff3ad8).
-function badArgs(t: Tool, a: unknown) {
+// Checks the types the tools declare (scripts/check-mcp.ts pins that they declare no other).
+export function badArgs(t: Pick<Tool, "name" | "inputSchema">, a: unknown) {
   if (typeof a !== "object" || a === null || Array.isArray(a)) return `${t.name}: arguments must be an object`;
   const { properties, required = [] } = t.inputSchema;
   const args = a as Record<string, unknown>;
@@ -187,8 +188,8 @@ function badArgs(t: Tool, a: unknown) {
       if (!p) return [`unknown argument ${k}`];
       if (v == null) return [];
       if (p.enum && !p.enum.includes(v)) return [`${k} must be one of ${p.enum.join(", ")}`];
-      const ok = ({ integer: Number.isInteger(v), string: typeof v === "string", array: Array.isArray(v) } as Record<string, boolean>)[p.type];
-      return ok === false ? [`${k} must be ${p.type === "array" || p.type === "integer" ? "an" : "a"} ${p.type}`] : [];
+      const ok = ({ integer: Number.isInteger(v), string: typeof v === "string", boolean: typeof v === "boolean", array: Array.isArray(v) && (p.items?.type !== "integer" || v.every(Number.isInteger)) } as Record<string, boolean>)[p.type];
+      return ok === false ? [`${k} must be ${p.type === "array" ? (p.items?.type === "integer" ? "an array of integers" : "an array") : p.type === "integer" ? "an integer" : p.type === "boolean" ? "a boolean" : "a string"}`] : [];
     }),
   ];
   return bad.length ? `${t.name}: ${bad.join("; ")}` : null;
