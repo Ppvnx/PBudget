@@ -19,7 +19,7 @@ async function ownedAccount(userId: string, accountId: unknown) {
   if (typeof accountId !== "string" || !accountId) return null;
   return prisma.plaidAccount.findFirst({
     where: { accountId, item: { userId } },
-    select: { accountId: true, item: { select: { institution: { select: { name: true } } } } },
+    select: { accountId: true, item: { select: { disconnectedAt: true, institution: { select: { name: true } } } } },
   });
 }
 
@@ -65,6 +65,8 @@ export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const account = await ownedAccount(user.id, form?.get("account_id"));
   if (!account) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // A live connection syncs its own transactions; screenshots would double them.
+  if (!account.item.disconnectedAt) return NextResponse.json({ error: "Screenshots are only for accounts disconnected from Plaid." }, { status: 409 });
   const file = form?.get("file");
   if (!(file instanceof Blob)) return NextResponse.json({ error: "Missing file" }, { status: 400 });
   if (file.size > MAX_IMAGE_BYTES) return NextResponse.json({ error: "That image is too large." }, { status: 413 });

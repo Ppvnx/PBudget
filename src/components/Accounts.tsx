@@ -264,7 +264,9 @@ export default function Accounts({
                           <button className="btn btn-sm" onClick={() => toggle("browse")}>
                             {view === "browse" ? t("accounts.hide") : t("accounts.browse")}
                           </button>
-                          {screenshots && (
+                          {/* Screenshots only fill accounts Plaid no longer syncs: on a live one
+                              they'd duplicate the synced rows. */}
+                          {screenshots && it.disconnected && (
                             <button className="btn btn-sm" onClick={() => toggle("shots")}>
                               {view === "shots" ? t("accounts.hide") : t("accounts.screenshots")}
                             </button>
