@@ -101,6 +101,26 @@ async function main(): Promise<void> {
     check(matchesCondition(bill, txn(120)), "amount max −100 matches a $120 spend (displayed −120)");
     check(!matchesCondition(bill, txn(-120)), "amount max −100 rejects $120 income (displayed +120)");
   }
+
+  // A stored regex runs on the server against every transaction. One that would hang (a
+  // repeated group that repeats inside) never runs and never matches — checked at match
+  // time too, because adopted/catalog copies skip the save-time check. Sane ones still match.
+  {
+    const txn = (name: string) => ({
+      name, merchantName: null, amount: 1, accountId: "a", paymentChannel: "online", category: null, datetime: new Date(),
+    });
+    const rx = (nameValue: string) => ({ nameOp: "regex", nameValue }) as unknown as VendorCondition;
+    const t0 = Date.now();
+    check(!matchesCondition(rx("^(a+)+$"), txn("a".repeat(28) + "!")), "a catastrophic stored regex never matches");
+    check(Date.now() - t0 < 500, "…because it never runs (answers at once)");
+    check(!matchesCondition(rx("^(a+)+$"), txn("aaa")), "…not even on text it would match");
+    check(!matchesCondition(rx("^(x|(y*)z){2,}$"), txn("zz")), "…nor when the inner repeat is one group deeper");
+    check(!matchesCondition(rx("x".repeat(201)), txn("x".repeat(201))), "an over-length stored regex never matches");
+    check(matchesCondition(rx("^(?=.*pts from)(?!.*12345).*$"), txn("PTS FROM: 999")), "lookaheads holding .* still match");
+    check(!matchesCondition(rx("^(?=.*pts from)(?!.*12345).*$"), txn("PTS FROM: 12345")), "…and still exclude");
+    check(matchesCondition(rx("GC.*DEPOSIT"), txn("gc 12-deposit")), "an ordinary pattern still matches");
+    check(matchesCondition(rx("^(ab){2,}[+*(]\\+$"), txn("abab(+")), "a repeated group with nothing repeating inside is fine");
+  }
   await reset();
 
   // Baseline: no vendors → the txn is unmatched and sits in the queue.
@@ -172,6 +192,10 @@ async function main(): Promise<void> {
   await reject400(
     () => createVendor(USER, { name: "Long Regex", matchConditions: [{ nameOp: "regex", nameValue: "a".repeat(201) }] }),
     "over-length regex"
+  );
+  await reject400(
+    () => createVendor(USER, { name: "Slow Regex", categoryName: "Grocery", matchConditions: [{ nameOp: "regex", nameValue: "^(\\w+\\s?)+$" }] }),
+    "regex with a repeated group that repeats inside"
   );
   await reject400(
     () => createVendor(USER, { name: "Bad Bounds", matchConditions: [{ amountMin: 100, amountMax: 10 }] }),

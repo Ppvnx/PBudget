@@ -21,17 +21,44 @@ const cents = (x: Prisma.Decimal | number): number => Math.round(Number(x) * 100
 
 export const REGEX_MAX_LEN = 200;
 
+// True for a repeated group whose body repeats too — (a+)+, (\d*)*, ((x|y)+){2,} — the
+// shape that backtracks exponentially on a near-miss and would pin a CPU for every
+// transaction it is tried on. Escapes and [classes] are skipped; `?` and {n} don't count.
+// ponytail: catches the classic shape only, not every slow pattern (overlapping
+// alternations like (a|a)+ pass). Run matching under a time budget if that ever bites.
+function nestedQuantifier(p: string): boolean {
+  const repeats = (i: number) => p[i] === "*" || p[i] === "+" || (p[i] === "{" && /^\{\d+,/.test(p.slice(i)));
+  const open: boolean[] = []; // per open group: does something inside it repeat?
+  let inClass = false;
+  for (let i = 0; i < p.length; i++) {
+    const ch = p[i];
+    if (ch === "\\") i++;
+    else if (inClass) inClass = ch !== "]";
+    else if (ch === "[") inClass = true;
+    else if (ch === "(") open.push(false);
+    else if (ch === ")") {
+      const inner = open.pop() ?? false;
+      if (inner && repeats(i + 1)) return true;
+      if (inner && open.length) open[open.length - 1] = true;
+    } else if (open.length && repeats(i)) open[open.length - 1] = true;
+  }
+  return false;
+}
+
 // null = valid; a string = the reason it was rejected. F3/F4 call this before
-// persisting a regex nameOp/merchantOp and 400 on a non-null result.
+// persisting a regex nameOp/merchantOp and 400 on a non-null result; textOp calls it
+// again at match time, so a pattern it refuses never runs however it was stored.
 export function validateRegex(pattern: string): string | null {
   if (pattern.length > REGEX_MAX_LEN)
     return `Regex too long (max ${REGEX_MAX_LEN} characters)`;
   try {
     new RegExp(pattern);
-    return null;
   } catch (e) {
     return `Invalid regex: ${(e as Error).message}`;
   }
+  if (nestedQuantifier(pattern))
+    return "Regex repeats a group that already repeats inside, like (a+)+, which can hang matching";
+  return null;
 }
 
 // --- Condition / row / vendor evaluation -------------------------------------
@@ -57,11 +84,8 @@ function textOp(
 ): boolean | null {
   if (!op || value == null || value === "") return null;
   if (op === "regex") {
-    try {
-      return new RegExp(value, "i").test(target);
-    } catch {
-      return false; // an unsaveable pattern that slipped through never matches
-    }
+    // An unsaveable pattern that slipped through (too long, invalid, catastrophic) never matches.
+    return validateRegex(value) === null && new RegExp(value, "i").test(target);
   }
   const v = normalizeStr(value);
   switch (op) {
