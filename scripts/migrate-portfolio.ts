@@ -5,7 +5,7 @@
 //   npm run migrate:portfolio -- --fixture  # reads the bundled fixture (no prod access)
 //
 // Env: OLD_DATABASE_URL (source Postgres), OLD_FERNET_KEY (Django's Fernet key),
-//      OWNER_EMAIL (attach everything to this existing user; default below),
+//      OWNER_EMAIL (attach everything to this existing user; required),
 //      APP_ENCRYPTION_KEY (this app's key, via .env — used to re-encrypt tokens).
 //
 // Design decisions (SPEC "Migration (F10)"): original Plaid transaction/account/
@@ -16,8 +16,6 @@
 import crypto from "crypto";
 import { prisma } from "../src/lib/db";
 import { encrypt } from "../src/lib/crypto";
-
-const DEFAULT_OWNER_EMAIL = "yuner25699@gmail.com";
 
 // ---- Source row shapes (snake_case columns, mirroring the Django tables) ----
 // Both readers (pg + fixture) yield these; only the reader differs.
@@ -179,7 +177,8 @@ async function migrate(rows: SourceRows, ownerId: string, fernetKey: string) {
 
 async function main(): Promise<void> {
   const fixture = process.argv.includes("--fixture");
-  const ownerEmail = process.env.OWNER_EMAIL || DEFAULT_OWNER_EMAIL;
+  const ownerEmail = process.env.OWNER_EMAIL;
+  if (!ownerEmail) throw new Error("OWNER_EMAIL is required (the existing user everything is attached to).");
 
   const owner = await prisma.user.findUnique({ where: { email: ownerEmail } });
   if (!owner) {

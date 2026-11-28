@@ -44,8 +44,8 @@ Prisma 6, SQLite dev / Postgres prod, port 5300), renamed to PBudget by FR11:
   5300); the manifest bakes `APP_URL=https://plaid.ppvnx.com` and
   `EMAIL_FROM=PlaidBudget <…>`. All of these are renamed by FR11.
 - **Old data**: the Portfolio Django app's `plaid_*`, `transactioncategory`, and
-  `plaidtransactionmeta` tables live in Postgres on leodb2 (Vault:
-  `secret/db/postgres/portfolio`); its Plaid access tokens are Fernet-encrypted (key
+  `plaidtransactionmeta` tables live in the old app's Postgres database (creds in
+  Vault); its Plaid access tokens are Fernet-encrypted (key
   recoverable from Portfolio git history — flagged for rotation post-migration).
 
 ## MVP scope
@@ -170,7 +170,7 @@ transfers are not spend).
 **FR8 — Portfolio data migration.** A one-off, idempotent, re-runnable script that
 copies the old Django app's institutions, items, accounts, transactions, categories
 (with budgets), and predicted categories into the Prisma schema, attaching everything
-to the owner's account (yuner25699@gmail.com). Access tokens are decrypted (Fernet)
+to the owner's account (`OWNER_EMAIL`). Access tokens are decrypted (Fernet)
 and re-encrypted with the app's AES-256-GCM key so banks stay connected without
 re-linking. Migrated rows **keep their original Plaid identifiers** (transaction, account,
 and item IDs) so the next 180-day sync upserts into the migrated rows instead of
@@ -210,13 +210,13 @@ never translated.
 **FR11 — Rename to PBudget (full technical rename; user decision, cycle 3).**
 User-facing branding (UI chrome, page titles, email sender name) becomes
 **PBudget**, and all technical identifiers follow: package name; image
-`leozhu:5000/pbudget`; deploy step `make deploy run=pbudget` (Setups k8s directory,
-manifest, and resource names renamed plaidbudget → pbudget); Vault paths
-`secret/pbudget/config` and `secret/db/postgres-ai/pbudget` (policy + role
-renamed; on first deploy the existing `secret/plaidbudget/config` **values are
-copied** to `secret/pbudget/config` — fresh-seeded only where no old value
-exists, never clobbering — while `secret/db/postgres-ai/pbudget` gets **new**
-creds for the new role; old plaidbudget paths retired after the copy); the
+`pbudget` in the cluster registry; deploy step `make deploy run=pbudget` (Setups k8s
+directory, manifest, and resource names renamed plaidbudget → pbudget); the app's
+Vault config and database-credential paths (policy + role renamed; on first deploy
+the existing plaidbudget config **values are copied** to the pbudget config path —
+fresh-seeded only where no old value exists, never clobbering — while the pbudget
+database path gets **new** creds for the new role; old plaidbudget paths retired
+after the copy); the
 app's own `pbudget` database + owner role in postgres-ai (bare SQL identifier);
 nginx-internal vhost `pbudget.conf` with `server_name pbudget.{{ domain }}`
 replacing `plaid.{{ domain }}`; `APP_URL=https://pbudget.ppvnx.com`;
@@ -344,17 +344,17 @@ Verifiable end-to-end against the seeded demo user (FR9) unless noted:
   criteria.
 - **Production — end goal: https://pbudget.ppvnx.com working.** From `~/Setups`,
   `make deploy run=pbudget` (renamed step per FR11: single pod, image
-  `leozhu:5000/pbudget` via the cluster registry, Vault-injected secrets, own
+  `pbudget` via the cluster registry, Vault-injected secrets, own
   `pbudget` database in postgres-ai, nginx-internal vhost
   `server_name pbudget.{{ domain }}`). The step carries the old deployment
-  over per FR11: copies `secret/plaidbudget/config` values to the new Vault
+  over per FR11: copies the plaidbudget Vault config values to the new Vault
   path and the plaidbudget database contents into `pbudget` before retiring
   the old resources. Health check:
   `curl -fsS https://pbudget.ppvnx.com/api/health` → HTTP 200 through the public
   hostname.
 - **Data migration (one-off, run by the owner):** `npm run migrate:portfolio` with
-  `OLD_DATABASE_URL` (Postgres on leodb2, creds from Vault
-  `secret/db/postgres/portfolio`) and `OLD_FERNET_KEY` in env; idempotent and
+  `OLD_DATABASE_URL` (the old app's Postgres, creds from Vault) and
+  `OLD_FERNET_KEY` in env; idempotent and
   re-runnable. Verified in CI/local against a fixture dump (criterion 11), not
   against production.
 
@@ -400,8 +400,8 @@ Verifiable end-to-end against the seeded demo user (FR9) unless noted:
 - **Reviewer defaults from cycle 3, round 2 — all three confirmed by the user in
   review cycle 4, round 1 (2026-07-03):** (a) the FR11 rename
   **carries data over** rather than starting fresh: plaidbudget database
-  contents are copied into `pbudget`, and `secret/plaidbudget/config` values
-  are copied to `secret/pbudget/config` (`secret/db/postgres-ai/pbudget` gets
+  contents are copied into `pbudget`, and the plaidbudget Vault config values
+  are copied to the pbudget config path (the pbudget database path gets
   new creds for the new role); (b) merge legs are **posted transactions only**
   (FR3/FR5) — pending rows are excluded from the merge picker, since their
   posted replacement arrives under a different Plaid ID; (c) the unusual-amount
